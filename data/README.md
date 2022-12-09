@@ -1,2 +1,2 @@
-# yukon-chinook
-Eventual home of a multi-CU integrated run-reconstruction and spawner-recruitment model that explicitly accounts for changes in the size, age, and sex of spawners over time.
+# yukon-chinook-data
+`harvest` folder contains harvest by age and fate (subsistence and commercial) by river section over time ('YkCk_Harvest_byDistrTypeStockAge.csv'). River sections 1-5 are in Alaska and section 7 is Canadian mainstem.
