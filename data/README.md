@@ -10,5 +10,6 @@
 | gsi | `gsiSamplesAllProbs.csv` | Genetic stock assignments to each Conservation Unit by gear (fish wheel, gillnet test fishery), year, and day (1985-2019)|
 
 Notes:
+- ASL data pre 2005 to be added.
 - ASL and GSI data need to be wrangled and merged. Requires discussion with DFO Molecular Genetics and sclerochronology labs and ADF&G ASL database folks. GSI data in this repo does not have unique ID that can be linked to origional ASL sample. 
 - 2022 Eagle sonar and harvest by distric data will be available in early 2023.
