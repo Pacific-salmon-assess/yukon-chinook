@@ -1,0 +1,57 @@
+load("/Users/rossi/yrcRR/data/chinookYkData.Rdata")
+ls()
+str(chinookYkData)
+setwd("..")
+library(dplyr)
+source("processData.R")
+setwd("~/yukon-chinook")
+source("processData.R")
+processData()
+counts
+head(counts)
+Q
+source("processData.R");processData()
+gsi <- read.csv('data/gsi/gsiSamplesAllProbs.csv')
+head(gsi)
+source("processData.R");processData()
+head(gsi)
+Q
+mr <- read.table('~/yrcRR/data/Yukon_chin_border_passage_indices.txt',#
+		header=T)
+mr
+mr <- read.csv('border-assessment/YkCk_BorderMR_Data.csv',
+)
+mr <- read.csv('border-assessment/YkCk_BorderMR_Data.csv')
+fmr <- read.csv('data/border-assessment/YkCk_BorderMR_Data.csv')
+fmr
+source("processData.R");processData()
+yrs
+Q
+source("processData.R");processData()
+mr
+mr$SE/mr$Estimate
+mean(mr$SE/mr$Estimate,na.rm=1)
+mean(mr$SE/mr$Estimate,na.rm=TRUE)
+years
+yrs
+mr[mr$years %in% yrs,]
+mr[mr$Year %in% yrs,]
+mr <- mr[mr$Year %in% yrs, ]
+is.na(mr$SE)
+Year$SE[is.na(mr$SE)]
+mr$SE[is.na(mr$SE)]
+mr$SE[is.na(mr$SE)] <- mr$Estimate[is.na(mr$SE)]*0.06
+mr
+Q
+source("processData.R");processData()
+source("processData.R");processData()
+source("fitChinook.R")
+fitRR()
+source("fitChinook.R")
+fitRR()
+install.packages("mvtnorm")
+fitRR()
+fitRR()
+fitRR()
+source("fitChinook.R")
+fitRR()

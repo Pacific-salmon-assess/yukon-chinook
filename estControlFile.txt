@@ -1,0 +1,37 @@
+# Estimation controls
+parameter value
+
+stocks c("LowerMainstem","WhiteDonjek","Pelly","Stewart","Carmacks","Teslin","MiddleMainstem","UpperLakesAndMainstem")
+stks c("L.Mstem","W.Donjek","Pelly","Stewart","Carmacks","Teslin","M.Mstem","U.Mstem")
+
+# Model bounds
+initYear 1985
+lastYear 2019
+
+# Optimization settings
+maxFunEval 100000
+maxIter 100000
+randEffects 0
+
+# Simulation-estimation
+simFolder "sim_eagleGSIx2"
+nSim 100
+nParallelCores 7
+
+# Initial parameter values
+inits$runSize_s rep(8000,8)
+inits$arrivMu_s rep(220,8)
+inits$arrivSD_s rep(2.4,8)
+inits$weightI 150
+inits$errSD_s rep(0.001,8)
+
+# Map 
+map$arrivMu_s 1:8
+map$arrivSD_s rep(NA,8)
+#map$errSD_s rep(NA,8)
+map$errSD_s 1:8
+map$qI_s rep(1,8)
+map$qFishWheel_s rep(1,8)
+map$corType "single"
+
+# <End File>
