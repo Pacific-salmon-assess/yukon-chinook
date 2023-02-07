@@ -42,23 +42,49 @@ asl <- read.csv(here("data/asl/ASL_Output_Chinook_FishWheels_1982-2012.csv")) |>
          Fish = as.numeric(Fish))
 
 #index
-index <- read.table(here("data/gsi/ExtractionSheets1982-2012.txt"), 
-                    fill = TRUE,
-                    sep = "\t",
-                    header=TRUE) |>
-  mutate(Fish = as.numeric(Fish), 
-         JulDate = as.numeric(JulDate)) |>
-  select(Year, JulDate, Fish, Vial)   
+index <- read_tsv(here("data/gsi/ExtractionSheets1982-2012.txt")) |>
+  select(Year, JulDate, Fish, Vial) 
 
-#merge-----------------------------------------------------------------------------------
+#merge and write--------------------------------------------------------------------------
 gsi_indexed <- left_join(gsi, index, by = c("Year", "JulDate", "Fish"))
 
-if(nrow(distinct(gsi_indexed, Fish, JulDate, Year, Vial)) != nrow(gsi_indexed)){
-  warning("something's buggered with the gsi-index")
-}
+asl_gsi <- full_join(asl, gsi_indexed, by = c("Year", "JulDate", "Fish", "Vial"))
 
-nrow(distinct(asl, Fish, JulDate, Year, Vial))
+write.csv(asl_gsi, here("data/cleaned/asl-gsi.csv"))
 
-asl_gsi <- full_join(asl, gsi_indexed, by = c("JulDate", "Year", "Fish", "Vial"))
 
-nrow(gsi_indexed) + nrow(asl) #why is this only 1 longer than asl_gsi?
+
+
+
+
+#doing some checks------------------------------------------------------------------------
+#what didn't have a match in asl from gsi?
+gsi_no_match <- anti_join(gsi_indexed, asl, by = c("Year", "JulDate", "Fish", "Vial"))
+#only 12 had matches?!
+semi_join(asl, gsi_indexed, by = c("Year", "JulDate", "Fish", "Vial"))
+
+#what's distinct in asl?
+asl <- asl |>
+  mutate(id = row_number()) #helper col for later
+
+asl_join <- asl |> #what we would join on
+  select(Year, JulDate, Fish, Vial) |>
+  arrange(Year, JulDate, Fish, Vial)
+
+asl_distinct <- asl |>
+  distinct(Year, JulDate, Fish, Vial, .keep_all = TRUE) |>
+  arrange(Year, JulDate, Fish, Vial)
+
+nrow(asl_join)-nrow(distinct(asl_join)) #2420 duplicates 
+
+asl_dups <- asl |> #the duplicates
+  filter(!(id %in% asl_distinct$id))
+
+asl_dup_fish <- asl |>
+  group_by(Year, JulDate, Fish, Vial) |>
+  summarise(n = n()) |>
+  filter(n != 1) #looks like there was some error to make lots of fis/vials have -1 in them
+
+gsi_distinct <- gsi_indexed |>
+  select(Year, JulDate, Fish, Vial) |>
+  arrange(Year, JulDate, Fish, Vial)
