@@ -10,7 +10,7 @@ library(lubridate)
   #observations/columns that aren't needed. 
 
 #gsi
-gsi <- readxl::read_xlsx(here("data/gsi/ChinookYukon_Retro_Sept_22_2021.xlsx"), 
+gsi <- readxl::read_xlsx(here("data/gsi/Copy of ChinookYukon_Retro_Sept_22_2021_2021-09-22.xlsx"), 
                          sheet = 'Individual Region IDs', 
                          skip = 3) |>
   filter(!(Comment %in% c("YukonRetro", "Number of missing Loci exceeded"))|is.na(Comment), 
@@ -31,6 +31,21 @@ gsi <- gsi |>
          JulDate = as.numeric(JulDate)) |>
   relocate(Fish, Year, JulDate, Gear, .before=Comment)
 
+nrow(gsi) - nrow(distinct(gsi, Year, Fish, JulDate)) #how many dups
+
+#extraction sheet (i.e. to index vial)
+extraction <- readxl::read_xlsx(here("data/gsi/Copy of ChinookYukon_Retro_Sept_22_2021_2021-09-22.xlsx"), 
+                                sheet = 'Extraction Sheet') |>
+  #guess to correct the funny vial names
+  mutate(Vial = ifelse(grepl("SR", Vial), 
+                       str_sub(Vial, 
+                               start = str_locate(Vial, "-")[,1]+1, 
+                               end = str_locate(Vial, "_")[,1]-1), 
+                       Vial), 
+         Year = as.numeric(gsub("Yukon River retrospective |Yukon River Retrospective FW", "", SampleName))) |>
+  select(Year, JulDate, Fish, Vial) 
+
+nrow(extraction) - nrow(distinct(extraction, Year, JulDate, Fish)) #how many dups
 
 #asl
 asl <- read.csv(here("data/asl/ASL_Output_Chinook_FishWheels_1982-2012.csv")) |>
@@ -41,14 +56,10 @@ asl <- read.csv(here("data/asl/ASL_Output_Chinook_FishWheels_1982-2012.csv")) |>
          Year = as.numeric(Year), 
          Fish = as.numeric(Fish))
 
-#index
-index <- read_tsv(here("data/gsi/ExtractionSheets1982-2012.txt")) |>
-  select(Year, JulDate, Fish, Vial) 
-
 #merge and write--------------------------------------------------------------------------
-gsi_indexed <- left_join(gsi, index, by = c("Year", "JulDate", "Fish"))
+gsi_extraction <- left_join(gsi, extraction, by = c("Year", "JulDate", "Fish")) #messed up cuz not distinct
 
-asl_gsi <- full_join(asl, gsi_indexed, by = c("Year", "JulDate", "Fish", "Vial"))
+asl_gsi <- full_join(asl, gsi_extraction, by = c("Year", "JulDate", "Vial"))
 
 write.csv(asl_gsi, here("data/cleaned/asl-gsi.csv"))
 
@@ -58,11 +69,13 @@ write.csv(asl_gsi, here("data/cleaned/asl-gsi.csv"))
 
 
 #doing some checks------------------------------------------------------------------------
-#what didn't have a match in asl from gsi?
-gsi_no_match <- anti_join(gsi_indexed, asl, by = c("Year", "JulDate", "Fish", "Vial"))
-#only 12 had matches?!
-semi_join(asl, gsi_indexed, by = c("Year", "JulDate", "Fish", "Vial"))
 
+
+#what didn't have a match in asl from gsi?
+gsi_no_match <- anti_join(gsi_extraction, asl, by = c("Year", "JulDate", "Fish", "Vial"))
+#only 12 had matches?!
+semi_join(asl, gsi_extraction, by = c("Year", "JulDate", "Fish", "Vial"))
+    
 #what's distinct in asl?
 asl <- asl |>
   mutate(id = row_number()) #helper col for later
@@ -86,5 +99,5 @@ asl_dup_fish <- asl |>
   filter(n != 1) #looks like there was some error to make lots of fis/vials have -1 in them
 
 gsi_distinct <- gsi_indexed |>
-  select(Year, JulDate, Fish, Vial) |>
-  arrange(Year, JulDate, Fish, Vial)
+  select(JulDate, Vial) |>
+  arrange(JulDate, Vial)
