@@ -8,8 +8,7 @@
 | border-assessment | `borderCounts.csv` | Daily counts of Chinook border passage at either Bio Island (fish wheels; 1985-2005) or Eagle (sonar; 2005-2022)|
 | border-assessment | `aslEagle.csv` | Raw age, sex, length, data from multi-panel gillnet test fishery at Eagle (2005-2019)|
 | gsi | `gsiSamplesAllProbs.csv` | Genetic stock assignments to each Conservation Unit by gear (fish wheel, gillnet test fishery), year, and day (1985-2019)|
-| gsi | `ChinookYukon_Retro_Sept_22_2021.xlsx` | retrospective Genetic stock assignments to each Conservation Unit by gear (fish wheel, gillnet test fishery), year, and day (1985-2012)|
-| gsi | `ExtractionSheets1982-2012.txt` | table used to link the GSI and ASL data |
+| gsi | `Copy of ChinookYukon_Retro_Sept_22_2021.xlsx` | retrospective Genetic stock assignments to each Conservation Unit by gear (fish wheel, gillnet test fishery), year, and day (1985-2012). Also contains a tab for the Extraction sheet that will be used to link the GSI and ASL data.|
 | asl | `ASL_Output_Chinook_FishWheels_1982-2012.csv` | Age, sex, and length (asl) data from fish wheel 1982-2012) |
 
 Notes:
