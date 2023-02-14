@@ -1,9 +1,7 @@
 #wrangling ASL data into one array
 
 library(tidyverse)
-library(readxl)
 library(here)
-library(lubridate)
 
 #helper funs-----------------------------------------------------------------------------
 #needed since using native pipe (i.e. referencing '.' doesn't work)
