@@ -29,9 +29,8 @@ asl <- read.csv(here("data/asl/yukon-chinook-ASL-ADFG-database-acessed-13Feb2023
 
 har_age <- read.csv(here("data/harvest/YkCk_Harvest_byDistrTypeStockAge.csv"), 
                     skip = 5) |>
-  #WHAT ABOUT WHEN DISTRICT==0?
   mutate(River.Section = case_when(District <= 2 ~ "below_pilot",
-                                   District>=3 & District<=6 ~ "above_pilot", 
+                                   District >=3 & District<=6 ~ "above_pilot", 
                                   District == 7 ~ "Canada")) |> 
   arrange(Year, Fishery, River.Section)
 
@@ -42,5 +41,5 @@ har_age <- har_age |>
          '2.3', '2.4', '2.5')
 
 #write tables-----------------------------------------------------------------------------
-write.csv(asl, here("data/cleaned-data/age-table.csv"))
-write.csv(har_age, here("data/cleaned-data/harvested-age-table.csv"))
+write.csv(asl, here("data/cleaned-data/age-table.csv"), row.names = FALSE)
+write.csv(har_age, here("data/cleaned-data/harvested-age-table.csv"), row.names = FALSE)
