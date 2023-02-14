@@ -1,4 +1,4 @@
-#wrangling ASL data into one array
+#wrangling ASL data into 2 matrices
 
 library(tidyverse)
 library(here)
