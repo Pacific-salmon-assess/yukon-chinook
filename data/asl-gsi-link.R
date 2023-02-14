@@ -19,7 +19,7 @@ gsi <- readxl::read_xlsx(here("data/gsi/Copy of ChinookYukon_Retro_Sept_22_2021_
 colnames(gsi)[13:16] <- c("Region 6", "Prob 6", "Region 7", "Prob 7")
 
 gsi <- gsi |>
-  cbind(as.data.frame(str_split_fixed(gsi$Fish, " ", 5))) |>
+  cbind(as.data.frame(str_split_fixed(gsi$Fish, " ", 5))) |> #swap to seperate() for clarity?
   select(-Fish, -V1) |>
   rename(Year = V2, 
          Gear = V3, 
@@ -66,10 +66,20 @@ nrow(filter(gsi_extraction, is.na(Vial))) #number of rows that didn't get a vial
 asl_gsi <- full_join(asl, gsi_extraction, by = c("Year", "JulDate", "Vial"))
 
 nrow(filter(asl_gsi, !is.na(Project) & is.na(`Region 1`)))  #rows with asl only
-nrow(filter(asl_gsi, is.na(Project) & !is.na(`Region 1`)))#rows with gsi only
-nrow(filter(asl_gsi, !is.na(Project) & !is.na(`Region 1`)))#rows with both
+nrow(filter(asl_gsi, is.na(Project) & !is.na(`Region 1`))) #rows with gsi only
+nrow(filter(asl_gsi, !is.na(Project) & !is.na(`Region 1`))) #rows with both
 
 write.csv(asl_gsi, here("data/cleaned/asl-gsi.csv"))
+
+#check the data by year-------------------------------------------------------------------
+full_year_check <- filter(asl_gsi, !is.na(Project) & !is.na(`Region 1`)) |>
+  group_by(Year) |>
+  summarise(n())
+
+asl_year_check <- filter(asl_gsi, !is.na(Project) & is.na(`Region 1`)) |>
+  group_by(Year) |>
+  summarise(n())
+
 
 #misc checks------------------------------------------------------------------------------
 asl_dup_fish <- asl |>
