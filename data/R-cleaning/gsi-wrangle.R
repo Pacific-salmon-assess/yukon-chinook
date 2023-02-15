@@ -47,4 +47,4 @@ clean_new_gsi <- rbind(gsi1, gsi2, gsi3, gsi4, gsi5) |>
 all_gsi <- bind_rows(old_gsi, clean_new_gsi)
 
 #write it---------------------------------------------------------------------------------
-write.csv(all_gsi, here("data/cleaned-data/border-gsi.csv"), row.names = FALSE)
+write.csv(all_gsi, here("data/cleaned-data/border-gsi-table.csv"), row.names = FALSE)
