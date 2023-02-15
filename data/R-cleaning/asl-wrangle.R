@@ -14,11 +14,11 @@ my_replace <- function(x){
 
 #read in and wrangle tables-------------------------------------------------------------- 
 asl <- read.csv(here("data/asl/yukon-chinook-ASL-ADFG-database-acessed-13Feb2023.csv")) |>
-  select(Sample.Year, Sex, Fresh.Water.Age, Salt.Water.Age) |>
+  select(Sample.Year, Gear, Sex, Fresh.Water.Age, Salt.Water.Age) |>
   filter(!is.na(Fresh.Water.Age) & !is.na(Salt.Water.Age)) |>
   mutate(Age = paste0(Fresh.Water.Age, ".", Salt.Water.Age)) |>
   rename(Year = Sample.Year) |>
-  group_by(Year, Sex, Age) |>
+  group_by(Year, Sex, Gear, Age) |>
   summarise(n = n()) |>
   arrange(as.numeric(Age)) |>
   pivot_wider(names_from = Age, 
