@@ -42,5 +42,5 @@ har_age <- har_age |>
          '2.3', '2.4', '2.5')
 
 #write tables-----------------------------------------------------------------------------
-write.csv(asl, here("data/cleaned-data/age-table.csv"), row.names = FALSE)
-write.csv(har_age, here("data/cleaned-data/harvested-age-table.csv"), row.names = FALSE)
+write.csv(asl, here("data/cleaned-data/border-age-table.csv"), row.names = FALSE)
+write.csv(har_age, here("data/cleaned-data/harvest-age-table.csv"), row.names = FALSE)
