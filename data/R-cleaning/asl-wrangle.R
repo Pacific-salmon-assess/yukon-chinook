@@ -29,8 +29,9 @@ asl <- read.csv(here("data/asl/yukon-chinook-ASL-ADFG-database-acessed-13Feb2023
 
 har_age <- read.csv(here("data/harvest/YkCk_Harvest_byDistrTypeStockAge.csv"), 
                     skip = 5) |>
+  filter(Stock == "Upper") |>
   mutate(River.Section = case_when(District <= 2 ~ "below_pilot",
-                                   District >=3 & District<=6 ~ "above_pilot", 
+                                   District >=3 & District<6 ~ "above_pilot", 
                                   District == 7 ~ "Canada")) |> 
   arrange(Year, Fishery, River.Section)
 
