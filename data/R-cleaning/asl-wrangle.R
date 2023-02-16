@@ -50,15 +50,23 @@ har_age <- read.csv(here("data/harvest/YkCk_Harvest_byDistrTypeStockAge.csv"),
                                   District == 7 ~ "Canada")) |> 
   mutate(Fishery.type = case_when(Fishery == "US_Subsistence" ~ "Subsistence",
                                   Fishery == "US_Comm" ~ "Commercial")) |> 
-  arrange(Year, Fishery, River.Section)
+  arrange(Year, Fishery, River.Section) 
 
 colnames(har_age) <- gsub("Age", "", colnames(har_age))
 
-har_age <- har_age |>
+har_age2 <- har_age |>
   select(Year, Fishery.type, River.Section, '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '2.2', 
-         '2.3', '2.4', '2.5')
+         '2.3', '2.4', '2.5')|>
+  pivot_longer(!Year:River.Section, names_to = "Age", values_to = "harvest") |>
+  group_by(Year, Fishery.type, River.Section, Age) |>
+  summarise(harvest = sum(harvest)) |>
+  pivot_wider(names_from = Age, 
+              values_from = harvest) |>
+  my_replace()|>
+  arrange(Year) |>
+  as.data.frame()
 
 #write tables-----------------------------------------------------------------------------
 write.csv(as, here("data/cleaned-data/border-age-table.csv"), row.names = FALSE)
 write.csv(asl, here("data/cleaned-data/border-length-table.csv"), row.names = FALSE)
-write.csv(har_age, here("data/cleaned-data/harvest-age-table.csv"), row.names = FALSE)
+write.csv(har_age2, here("data/cleaned-data/harvest-age-table.csv"), row.names = FALSE)
