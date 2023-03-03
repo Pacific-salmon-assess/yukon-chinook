@@ -34,6 +34,7 @@ library(reshape2)
 library(parallel)
 library(mvtnorm)
 
+source("processData.R")   # Data processing
 #source("simRR.R")   # Simulate run reconstruction
 source("fitChinook.R")   # Fit run reconstruction
 #source("fitSim.R")  # Fit run reconstruction to simmed data
@@ -42,4 +43,4 @@ source("tools.R")   # Background functions
 source("plot.R")    # Plotting functions
 
 # Compile TMB objective function
-compile("yukonChinookIntegrated.cpp")
+loadModel("yukonChinookIntegrated")

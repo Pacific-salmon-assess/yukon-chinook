@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+log.txt
+sink.txt
+docs
+.DS_Store

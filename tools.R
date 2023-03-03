@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------#
-# simRR.R                                                                     #
+# tools.R                                                                     #
 # Helper functions for Yukon River Chinook run reconstruction                 #
 #                                                                             #
 # Copyright 2019 by Landmark Fisheries Research, Ltd.                         #
@@ -26,6 +26,13 @@
 # POSSIBILITY OF SUCH DAMAGE.                                                 #
 #-----------------------------------------------------------------------------#
 
+loadModel <- function( name )
+{
+  if(name %in% names(getLoadedDLLs()))
+    dyn.unload(dynlib(name))          # unlink the C++ code if already linked
+  compile(paste0(name,".cpp"),flags = "")
+  dyn.load(dynlib(name))          # Dynamically link the C++ code
+}
 
 rnbinom2 <- function( n, mu, sd )
 {
@@ -59,7 +66,7 @@ logit<-function( x, lb=0, ub=1 )
 }
 
 # Bounded inverse logit transformation
-invLogit<-function( x, lb=0, ub=1 )
+invlogit<-function( x, lb=0, ub=1 )
   lb + (ub-lb)*exp(x)/(1.+exp(x))
 
 plotbg <- function(col=rgb(235,235,235,maxColorValue=255))
@@ -67,6 +74,36 @@ plotbg <- function(col=rgb(235,235,235,maxColorValue=255))
   rect(par("usr")[1],par("usr")[3],par("usr")[2],par("usr")[4],col=col)
   grid( col="white", lty=1 )
 }
+
+# Pearson selectivity - modified from B. Staton's script
+# sigma > 0, theta > 0
+getPearsonSel <- function( RLM,
+                           lambda      = -0.547,
+                           theta       = 0.622,
+                           sigma       = 0.204,
+                           tau         = 1.920,
+                           standardize = TRUE )
+{
+ 
+  # enforce parameter constraints
+  if(any(sigma <= 0))
+    stop("sigma must be > 0")
+  if(any(theta <= 0))
+  stop("theta must be > 0")
+  
+  t1 <- (1 + lambda^2/(4 * theta^2))^theta
+  t2 <- RLM - (sigma * lambda)/(2 * theta) - tau
+  t3 <- (1 + t2^2/sigma^2)^-theta
+  t4 <- exp(-lambda * (atan(t2/sigma) + atan(lambda/(2 * theta))))
+  v  <- t1 * t3 * t4
+  
+  # standardize the output so only one age/sex is fully vuln for a gear
+  if(standardize)
+    v <- v/max(v)
+  
+  return(v)
+}
+
 
 # Map lower triangle to upper triangle
 mirrorMatrix <- function(x)

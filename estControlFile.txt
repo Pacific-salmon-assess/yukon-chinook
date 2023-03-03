@@ -3,10 +3,15 @@ parameter value
 
 stocks c("LowerMainstem","WhiteDonjek","Pelly","Stewart","Carmacks","Teslin","MiddleMainstem","UpperLakesAndMainstem")
 stks c("L.Mstem","W.Donjek","Pelly","Stewart","Carmacks","Teslin","M.Mstem","U.Mstem")
+regions c("BP","AP","CA")
+fisheryType c("Subsistence","Commercial")
+gears c("fishWheel","eagle")
+ages 4:7
+meshSizes c(6,7.5,8)
 
 # Model bounds
 initYear 1985
-lastYear 2019
+lastYear 2021
 
 # Optimization settings
 maxFunEval 100000
@@ -19,19 +24,20 @@ nSim 100
 nParallelCores 7
 
 # Initial parameter values
-inits$runSize_s rep(8000,8)
-inits$arrivMu_s rep(220,8)
-inits$arrivSD_s rep(2.4,8)
+inits$runSize_p rep(8000,8)
+inits$arrivMu_p rep(220,8)
+inits$arrivSD_p rep(2.4,8)
 inits$weightI 150
-inits$errSD_s rep(0.001,8)
+inits$errSD_p rep(0.0025,8)
 
 # Map 
-map$arrivMu_s 1:8
-map$arrivSD_s rep(NA,8)
-#map$errSD_s rep(NA,8)
-map$errSD_s 1:8
-map$qI_s rep(1,8)
-map$qFishWheel_s rep(1,8)
+map$arrivMu_p 1:8
+map$arrivSD_p rep(1,8)
+#map$arrivSD_p rep(1,8)
+#map$errSD_p rep(NA,8)
+map$errSD_p rep(1,8)
+map$qI_p rep(1,8)
+map$qFishWheel_p rep(1,8)
 map$corType "single"
 
 # <End File>
