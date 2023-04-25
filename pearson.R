@@ -29,7 +29,7 @@ processASL <- function( fillNAs=TRUE )
 								sexID!=-1,
 								mesh%in%c(5.25,6.5,7.5,8.5) ) %>%
 				select( sampleYear, mesh, sexID, age, length, RLM )
-browser()
+
 	dfLen <- df %>%
 					 group_by( sampleYear, sexID, age )
 
@@ -60,13 +60,7 @@ browser()
 			dfi <- filter( df, age==ages[i] ) %>%
 						 group_by(sampleYear,sexID,mesh) %>%
 						 summarize(length=mean(length),RLM=mean(RLM))
-			#dfm <- filter( dfi, sexID==1 )$length
-			#dfmx <- filter( dfi, sexID==1 )$sampleYear
-			#dfmr <- filter( dfi, sexID==1 )$RLM
-			#dff <- filter( dfi, sexID==2 )$length
-			#dffx <- filter( dfi, sexID==2 )$sampleYear
-			#dffr <- filter( dfi, sexID==2 )$RLM
-		
+
 			for( s in 1:2 )
 			{
 				dfim <- filter( dfi, sexID==s, mesh==meshIn[m] )
@@ -77,11 +71,6 @@ browser()
 
 				dfimn <- dfimLen
 				nL_ast[i,s,dfimn$sampleYear-min(yr)+1] <- dfimn$n
-
-
-
-#				RLM_astm[i,s,is.na(RLM_astm[i,s, ,m]),m] <- mean(RLM_astm[i,s, ,m],na.rm=TRUE)
-
 
 				if( m==1 )
 				{
@@ -99,11 +88,6 @@ browser()
 	save( RLM_astm, file="data/modelObjects/RLM_astm.Rdata" )
 
 }
-# units for mesh and length ?
-# mesh presumably inches
-# length = mm?
-# mesh = "stretch length"
-
 
 plotRLM <- function()
 {

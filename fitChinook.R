@@ -1,8 +1,8 @@
 #-----------------------------------------------------------------------------#
 # fitRR.R                                                                     #
-# Estimation functions for Yukon River Chinook run reconstruction             #
+# Estimation functions for integrated Yukon River Chinook run reconstruction  #
 #                                                                             #
-# Copyright 2019 by Landmark Fisheries Research, Ltd.                         #
+# Copyright 2023 by Landmark Fisheries Research, Ltd.                         #
 #                                                                             #
 # This software is provided to DFO in the hope that it will be                #
 # useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      #
@@ -27,13 +27,14 @@
 #-----------------------------------------------------------------------------#
 
 
-# Fit run reconstruction
+# Fit model
 fitRR <- function( ctlFile="estControlFile.txt",
                    arrivSD=NULL,
-                   folder="test",
+                   folder="zzz",
                    simData=NULL,
                    saveRun=TRUE,
-                   fitRR=1 )
+                   fitRR=1,
+                   sType=1 )
 {
   folder <- paste0("fits/",folder)
 
@@ -91,21 +92,31 @@ fitRR <- function( ctlFile="estControlFile.txt",
     }
   }
 
-  #n_sdtg[ , ,17,2] <- NA
-
-  # Hamazaki 2018
+  # Hamazaki 2018 selectivity-at-age estimates
   fishWheelSel_sa <- rbind( c(1,0.295,0.123,0.118), c(0.36,0.129,0.092,0.045) )
 
+  # Survey selectivity by gear
   v_asg <- array( data=1, dim=c(nA,2,2) )
-  v_asg[ , ,1] <- fishWheelSel_sa
+  v_asg[ , ,1] <- t(fishWheelSel_sa)
 
+  # Reproductive output
   z_ast <- array( data=1, dim=c(nA,2,nT) )
 
-  catchSD_rh <- array( data=0.1, dim=c(nR,nH) )
-  #catchSD_rh[ 2] <- 0.1
+  if( sType==2 )
+    z_ast <- chinookYkData$zEggNum_ast*1e-3
+  else if( sType==3 )
+    z_ast <- chinookYkData$zEggMass_ast*1e-3
+
+  catchSD_rh <- array( data=0.05, dim=c(nR,nH) )
 
   mrCV_t <- rep(0.06,nT)
-  mrCV_t[17] <- 0.03
+  #mrCV_t[17] <- 0.03
+
+  pearPrior <- rbind( c(-0.547,0.075,1),
+                      c(0.622,0.033,1),
+                      c(0.204,0.021,1),
+                      c(1.92,0.012,1) )
+  pearPrior[ ,2] <- c(5,5,2,5)*pearPrior[ ,2]
 
   # Create TMB data object
   data <- list( obsC_rht   = chinookYkData$obsC_rht,
@@ -124,7 +135,10 @@ fitRR <- function( ctlFile="estControlFile.txt",
                 mesh_rht   = chinookYkData$mesh_rht,
                 v_asg      = v_asg,
                 weightI    = 1,
-                etaSD      = 1 )
+                etaSD      = 1,
+                pearPrior  = pearPrior,
+                phiPrior   = c(0.1,1),
+                UMSYPrior  = c(0.5,0.25,1) )
 
 
   # Simulated data
@@ -146,27 +160,28 @@ fitRR <- function( ctlFile="estControlFile.txt",
   diag(cor_pp) <- 1 # Correlation matrix must have 1 on diagonal
 
   lnDisp_tg  <- matrix( data=log(1e-4), nrow=nT, ncol=nG )
-  lnDisp_tg[ ,1] <- log(5e-3)
-  lnDisp_tg[17,1] <- log(1.)
 
   initEta_asy <- array( data=0, dim=c(nA-1,2,nY) )
-  initEta_asy[1, , ] <- log(4)
-  initEta_asy[2, , ] <- log(3)
-  initEta_asy[3, , ] <- log(2)
+  initEta_asy[1, , ] <- log(5)
+  initEta_asy[2, , ] <- log(6)
+  initEta_asy[3, , ] <- log(3)
 
   lnf_rht <- array(-10,dim=c(nR,nH,nT))
   lnf_rht[ ,1, ] <- c(0.1,0.35,0.15)
   lnf_rht[ ,2, ] <- c(0.4,0.05,0.15)
   lnf_rht[ data$obsC_rht==0 ] <- -10
 
+  pearPars <- pearPrior[ ,1]
+  pearPars[2:3] <- log(pearPars[2:3])
+
   # Create TMB parameter object
   pars <- list( lnR_py       = array(9,dim=c(nP,nY)),
                 lnf_rht      = lnf_rht,
                 lnUMSY_p     = rep(log(0.5),nP),
-                lnSMSY_p     = rep(log(5e3),nP),
-                lnRecSD_p    = rep(log(0.4),nP),
+                lnSMSY_p     = rep(log(3500),nP),
+                lnRecSD_p    = rep(log(1),nP),
                 logitPhi_p   = rep(0,nP),
-                pearPars     = c(-0.547,log(0.622),log(0.204),1.920),
+                pearPars     = pearPars,
                 logitpFem_y  = rep(0,nY),
                 lnpFemSD     = log(1),
                 initEta_asy  = initEta_asy,
@@ -178,6 +193,21 @@ fitRR <- function( ctlFile="estControlFile.txt",
                 lnqE_pg      = log(qE_pg),
                 lnqI_p       = log(qI_p),
                 lnDisp_tg    = lnDisp_tg )
+
+  if( sType>1 )
+  {
+    load("fits/mod1/rpt.Rdata")
+    pars$lnR_py <- rpt$lnR_py
+    pars$lnf_rht <- rpt$lnf_rht
+    pars$initEta_asy <- rpt$initEta_asy
+    pars$lnArrivMu_p <- rpt$lnArrivMu_p
+    pars$lnArrivSD_p <- rpt$lnArrivSD_p
+    pars$logitpFem_y <- rpt$logitpFem_y
+    pars$lnqE_pg <- rpt$lnqE_pg
+    pars$lnqI_p <- rpt$lnqI_p
+    pars$lnSMSY_p <- rpt$lnSMSY_p
+    pars$lnUMSY_p <- rpt$lnUMSY_p
+  }
 
 
   if(!is.null(arrivSD))
@@ -211,16 +241,22 @@ fitRR <- function( ctlFile="estControlFile.txt",
   fmap_rht <- array( data=1:(nR*nH*nT), dim=c(nR,nH,nT) )
   fmap_rht[data$obsC_rht==0] <- NA
 
+  # In the Pearson function, parameter τ
+  # determines length at peak selectivity, σ determines spread of selectivity,
+  # and λ and θ determine sharpness of selectivity to and from the peak selectivity.
+  # par order: pearLambda, pearTheta, pearSigma, pearTau
+
+  nFix <- 3
+  pFemMap <- c(1:(nY-nFix),rep(nY-nFix,nFix))
+
   map <- list( lnf_rht     = as.factor(fmap_rht),
-               pearPars    = as.factor(NA*pars$pearPars),
-               logitPhi_p  = as.factor(NA*pars$logitPhi_p),
-               #logitPhi_p  = as.factor(rep(1,nP)),
+               pearPars    = as.factor(c(NA,NA,NA,NA)),
+               logitpFem_y = as.factor(pFemMap),
+               logitPhi_p  = as.factor(rep(NA,nP)),
                lnpFemSD    = factor(NA),
-               #lnRecSD_p   = as.factor(rep(1,nP)),
+               lnRecSD_p   = as.factor(rep(1,nP)),
                lnArrivMu_p = as.factor(ctrl$map$arrivMu_p),
                lnArrivSD_p = as.factor(ctrl$map$arrivSD_p),
-               #arrivErr_pt = as.factor(NA*pars$arrivErr_pt),
-               lnErrSD_p   = as.factor(NA*ctrl$map$errSD_p),
                logitCor_pp = as.factor(NA*corMap_ps),
                lnqE_pg     = as.factor(qEmap_pg),
                lnqI_p      = as.factor(ctrl$map$qI_p),
@@ -228,16 +264,6 @@ fitRR <- function( ctlFile="estControlFile.txt",
 
 
   # BUILD AND OPTIMIZE OBJECTIVE FUNCTION ----------------------------------- #
-
-  # Compile and load objective function
-  #compile("yukonChinookIntegrated.cpp")
-  #dyn.load(dynlib("yukonChinookIntegrated"))
-
-#  load("/Users/rossi/yrcRR/mod1/rpt.Rdata")
-#  npars <- rpt[names(pars)]
-#browser()
-  #pars$lnRunSize_st <- round(npars$lnRunSize_st)
-  
 
   # Build objective function
   obj <- MakeADFun( data       = data,
@@ -249,22 +275,18 @@ fitRR <- function( ctlFile="estControlFile.txt",
   # Set bounds
   low <- obj$par*0-Inf
   upp <- obj$par*0+Inf
-  #low[names(low)=="cor_ss"] <- -1
-  #upp[names(upp)=="cor_ss"] <- 1
 
   # Optimization controlsarrivSD
   optCtrl <- list(  eval.max = ctrl$maxFunEval, 
                     iter.max = ctrl$maxIterations )
 
   # Optimize
-  #sink("sink.txt")
   opt <- try( nlminb( start     = obj$par,
                       objective = obj$fn,
                       gradient  = obj$gr,
                       lower     = low,
                       upper     = upp,
                       control   = optCtrl ) )
-  #sink()
 
   rptFE <- obj$report()
 
@@ -318,38 +340,11 @@ fitRR <- function( ctlFile="estControlFile.txt",
     rpt$sdrpt  <- sdrpt
     rpt$errGrad_st <- errGrad_st
 
-#    nObs <- sum(!is.na(data$n_pdtg[1, , , ])) +
-#            sum(!is.na(data$E_dtg)) + 
-#            length(data$I_t)
-#    nPar <- length(opt$par)
-#    nll  <- opt$objective
-#    aic  <- 2*nPar + 2*nll + 2*nPar*(nPar+1)/(nObs-nPar-1)
-#    rpt$aic <- aic
-  
-
-
-
-#  library(tmbstan)
-#  options(mc.cores = 3)
-#  mcinit <- list()
-#  for( i in 1:3 )
-#    mcinit[[i]] <- rnorm(n=length(obj$par),mean=obj$par,sd=1e-5)
-#  
-#  fit <- tmbstan( obj = obj,
-#                  chains = 3,
-#                  iter = 1e3,
-#                  init = mcinit )
-#  rpt$fit <- fit
-
-
-
-
-
-
     if( saveRun )
     {
       save( rpt, file=paste(folder,"/rpt.Rdata",sep="") )
       plotAll(rpt=rpt,folder=folder)
+      getParSummary(folder=folder)
       system( paste("cp ",ctlFile," ",folder,"/estControlFile.txt",sep="") )
     }
 

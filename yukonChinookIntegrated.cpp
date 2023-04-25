@@ -2,7 +2,7 @@
 // yukonChinookRunRecon.cpp                                                    //
 // Simulation functions for Yukon River Chinook run reconstruction             //
 //                                                                             //
-// Copyright 2022 by Landmark Fisheries Research, Ltd.                         //
+// Copyright 2023 by Landmark Fisheries Research, Ltd.                         //
 //                                                                             //
 // This software is provided to DFO in the hope that it will be                //
 // useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      //
@@ -82,11 +82,14 @@ Type objective_function<Type>::operator() ()
   DATA_INTEGER(aMin);         // Minimum age class
   DATA_INTEGER(aMax);         // Maximum age class
   DATA_ARRAY(z_ast);          // Reproductive quality
-  DATA_ARRAY(RLM_astm);      // Ratio of fish length to mesh perimeter
+  DATA_ARRAY(RLM_astm);       // Ratio of fish length to mesh perimeter
   DATA_IARRAY(mesh_rht);      // Mesh size index
   DATA_ARRAY(v_asg);          // Fish wheel selectivity
   DATA_SCALAR(weightI);       // Weight on border passage index NLL
   DATA_SCALAR(etaSD);         // SEs for border passage indices from mark-recapture
+  DATA_ARRAY(pearPrior);      // Pearson selectivity prior
+  DATA_VECTOR(phiPrior);      // Autocorrelation prior
+  DATA_VECTOR(UMSYPrior);     // UMSY prior
 
   // Model dimensions
   int nP = n_pdtg.dim(0);     // Number of stocks
@@ -104,12 +107,11 @@ Type objective_function<Type>::operator() ()
   PARAMETER_ARRAY(lnf_rht);      // Fully-selected fishing mortality
   PARAMETER_VECTOR(lnUMSY_p);    // UMSY
   PARAMETER_VECTOR(lnSMSY_p);    // SMSY
-  //PARAMETER_ARRAY(recDevs_pt);   // Recruitment deviations
   PARAMETER_VECTOR(lnRecSD_p);   // Recruitment deviation SD
   PARAMETER_VECTOR(logitPhi_p);  // Lag-1 autocorrelation in recruitment
   PARAMETER_VECTOR(pearPars);    // Pearson gillnet selectivity parameters
   PARAMETER_VECTOR(logitpFem_y); // Proportion female
-  PARAMETER(lnpFemSD);             // Proportion female
+  PARAMETER(lnpFemSD);           // Proportion female SD
   PARAMETER_ARRAY(initEta_asy);  // Raw proportions-at-age
 
   // Run reconstruction parameters
@@ -139,13 +141,12 @@ Type objective_function<Type>::operator() ()
 
   // Latent variables
   array<Type> N_asrpt(nA,2,nR,nP,nT);   // Abundance
-  array<Type> v_astm(nA,2,nT,nM);   // Selectivity
-  array<Type> borderPass_pt(nP,nT);     // Total border passage
+  array<Type> v_astm(nA,2,nT,nM);       // Selectivity
+  vector<Type> borderPass_t(nT);        // Total border passage
   array<Type> eta_aspy(nA,2,nP,nY);     // Age proportions
   array<Type> mu_pt(nP,nT);             // Mean Julian date of arrival
-  array<Type> omega_py(nP,nY);             // Mean Julian date of arrival
-  array<Type> J_dt(nD,nT);              // Daily total abundance
-  array<Type> J_dpt(nD,nP,nT);          // Daily abundance by stock
+  array<Type> omega_py(nP,nY);          // Mean Julian date of arrival
+  array<Type> J_dptg(nD,nP,nT,nG);      // Daily observable abundance by stock
   array<Type> rho_dpt(nD,nP,nT);        // Proportion of stock arriving each day
   matrix<Type> cor_pp(nP,nP);           // Arrival timing correlation matrix
   array<Type> F_arhst(nA,nR,nH,2,nT);   // Fishery-specific mortality
@@ -161,21 +162,25 @@ Type objective_function<Type>::operator() ()
   array<Type> Ihat_dtg(nD,nT,nG);       // Predicted abundance
   vector<Type> mrIhat_t(nT);            // Predicted border passage
   array<Type> Phat_pdtg(nP,nD,nT,nG);   // Predicted proportions by stock
+  array<Type> runSize_pt(nP,nT);        // Predicted proportions by stock
+  vector<Type> runSize_t(nT);           // Predicted proportions by stock
+  vector<Type> pFem_y(nY);              // Predicted proportions by stock
+  vector<Type> relReproOutput_t(nT);    // Relative reproductive output
+  vector<Type> meanMu_p(nP);            // Mean arrival timing
 
   // Likelihood components
-  array<Type> nllI_tg(nT,nG);  // Total daily count NLL
-  vector<Type> nllP_g(nG);     // Stock-composition NLL
-  array<Type> nllC_rht(nR,nH,nT);             // Catch NLL
-  Type nllxB  = 0;             // Border age/sex-composition NLL
-  array<Type> nllxC_rht(nR,nH,nT);             // Catch age/sex-composition NLL
-  Type nllMR  = 0;             // Mark-capture border passage NLL
-  array<Type> nllR_py(nP,nY);
-  Type nlp    = 0;             // Prior penalty
-  Type varPen = 0;             // posfun penalty
+  array<Type> nllI_tg(nT,nG);       // Total daily count NLL
+  vector<Type> nllP_g(nG);          // Stock-composition NLL
+  array<Type> nllC_rht(nR,nH,nT);   // Catch NLL
+  Type nllxB  = 0;                  // Border age/sex-composition NLL
+  array<Type> nllxC_rht(nR,nH,nT);  // Catch age/sex-composition NLL
+  Type nllMR  = 0;                  // Mark-capture border passage NLL
+  array<Type> nllR_py(nP,nY);       // Recruitment NLL
+  Type nlp    = 0;                  // Prior penalty
+  Type varPen = 0;                  // posfun penalty
 
   // Initialize variables
   R_py.fill(0);
-  J_dt.fill(0);
   nllI_tg.fill(0);
   nllP_g.fill(0);
   F_arst.fill(0);
@@ -189,19 +194,23 @@ Type objective_function<Type>::operator() ()
   nllC_rht.fill(0);
   nllxC_rht.fill(0);
   nllR_py.fill(0);
+  runSize_t.fill(0);
+  borderPass_t.fill(0);
+  meanMu_p.fill(0);
 
   for( int p=0; p<nP; p++ )
     phi_p(p) = binvlogit(logitPhi_p(p));
 
-  // Intialize random walks
+  // Intialize random walk
   mu_pt.col(0) = exp(lnArrivMu_p);
 
   for( int y=0; y<nY; y++ )
   {
+    pFem_y(y) = invlogit(logitpFem_y(y));
     for( int p=0; p<nP; p++ )
     {
-      R_spy(0,p,y) = exp(lnR_py(p,y)) * (1 - invlogit(logitpFem_y(y)));
-      R_spy(1,p,y) = exp(lnR_py(p,y)) * invlogit(logitpFem_y(y));
+      R_spy(0,p,y) = exp(lnR_py(p,y)) * (1 - pFem_y(y));
+      R_spy(1,p,y) = exp(lnR_py(p,y)) * pFem_y(y);
 
       for( int s=0; s<2; s++ )
       {
@@ -217,27 +226,22 @@ Type objective_function<Type>::operator() ()
 
       }
     }
-
-//    if( y>0 )
-//      nlp -= dnorm( logitpFem_y(y), logitpFem_y(y-1), exp(lnpFemSD), TRUE );
   }
-
-
-
 
   // In-season abundance dynamics
   for( int t=0; t<nT; t++ )
   {
+    // Fishery selectivity by mesh size
     for( int m=0; m<nM; m++ )
     {
       vector<Type> tmp6(2);
       vector<Type> tmp7(nA);
-      // Fishery selectivity
       for( int s=0; s<2; s++ )
       {
+        // Pearson selectivity
         Type tmp1 = pow(1 + square(pearLambda)/(4 * square(pearTheta)),pearTheta);
         vector<Type> tmp2 = RLM_astm.col(m).col(t).col(s) - (pearSigma * pearLambda)/(2 * pearTheta) - pearTau;
-        vector<Type> tmp3 = 1 + (tmp2*tmp2)/(pearSigma*pearSigma);
+        vector<Type> tmp3 = 1 + (tmp2*tmp2)/pow(pearSigma,2);
         vector<Type> tmp4(nA);
         for( int a=0; a<nA; a++ )
           tmp4(a)= pow(tmp3(a),-pearTheta);
@@ -247,14 +251,12 @@ Type objective_function<Type>::operator() ()
         tmp6(s) = max(tmp7);
       }  // next s
       matrix<Type> vtmp = v_astm.col(m).col(t);
-      //v_asrtm.col(m).col(t).col(r) /= max(v_asrtm.col(m).col(t).col(r));
       v_astm.col(m).col(t) = vtmp / max(tmp6);
     }  // next m
 
-    // Selectivity + fishing mortality
+    // Fishing mortality
     for( int r=0; r<nR; r++ )
-    {
-      // Fishing mortality      
+    {    
       for( int s=0; s<2; s++ )
       {
         for( int h=0; h<nH; h++ )
@@ -268,7 +270,6 @@ Type objective_function<Type>::operator() ()
       }  // next s
     }  // next r
 
-
     for( int p=0; p<nP; p++ )
     {
       
@@ -278,7 +279,7 @@ Type objective_function<Type>::operator() ()
         for( int a=0; a<nA; a++ )
           N_asrpt(a,s,0,p,t) = R_spy(s,p,t+nA-a-1) * eta_aspy(a,s,p,t+nA-a-1);
 
-        // Arrival to pilot and border border
+        // Arrival to pilot and border
         for( int r=1; r<nR; r++ )
         {
           vector<Type> tmpF0_a = F_arst.col(t).col(s).col(r-1);
@@ -306,15 +307,22 @@ Type objective_function<Type>::operator() ()
                                                    F_arhst.col(t).col(s).col(h).col(r) *
                                                    (1-exp(-tmpF_a)) /
                                                    tmpF_a;
-          }  // next g
+          }  // next h
         }  // next r
       }  // next s
 
       // Border age/sex-comps
       for( int g=0; g<nG; g++ )
-        xB_asgt.col(t).col(g) += N_asrpt.col(t).col(p).col(1)*v_asg.col(g);
+        xB_asgt.col(t).col(g) += N_asrpt.col(t).col(p).col(2)*v_asg.col(g);
+
+      // Save quantities of interest for ADREPORTing
+      runSize_pt(p,t) = N_asrpt.col(t).col(p).col(0).sum();
+      runSize_t(t) += runSize_pt(p,t);
+      borderPass_t(t) += N_asrpt.col(t).col(p).col(nR-1).sum();
 
     }  // next p
+
+    relReproOutput_t(t) = Z_pt.col(t).sum() / S_aspt.col(t).sum();
   
     // Border age/sex-comps NLL
     for( int g=0; g<nG; g++ )
@@ -358,13 +366,8 @@ Type objective_function<Type>::operator() ()
             nllxC_rht(r,h,t) -= dmultinom( obs_j, est_j, TRUE );
           }
         }
-        else
-        {
-          nllC_rht(r,h,t) += pow(Csum,2);
-        }
       }  // next r
     }  // next h
-
 
     // RUN RECONSTRUCTION
 
@@ -385,20 +388,20 @@ Type objective_function<Type>::operator() ()
       // Convert relative daily arrivals to proportions
       rho_dpt.col(t).col(p) /= rho_dpt.col(t).col(p).sum();
 
-      // Daily abundance
-      J_dpt.col(t).col(p) = N_asrpt.col(t).col(p).col(2).sum()*rho_dpt.col(t).col(p);
-
-      // Add to aggregate abundance
-      J_dt.col(t) += J_dpt.col(t).col(p);
-
       // Store predicted abundance
       for( int g=0; g<nG; g++ )
-        Ihat_dtg.col(g).col(t) += exp(lnqE_pg(p,g))*J_dpt.col(t).col(p);
+      {
+        J_dptg.col(g).col(t).col(p) = (N_asrpt.col(t).col(p).col(2)*v_asg.col(g)).sum()*rho_dpt.col(t).col(p);
+        Ihat_dtg.col(g).col(t) += exp(lnqE_pg(p,g))*J_dptg.col(g).col(t).col(p);
+      }
 
-    } // next s
+    } // next p
+
+    meanMu_p += mu_pt.col(t);
 
   } // next t
 
+  meanMu_p /= nT;
 
   // Observation model ----------------------------------------------------- //
 
@@ -417,19 +420,13 @@ Type objective_function<Type>::operator() ()
           // Neg-binomial variance
           Type var = mu+mu*mu*exp(lnDisp_tg(t,g));
           
-
-          // check
-          //if( t==16 & h==1 & d<60 )
-          // Type var = mu + Type(1e-4);
-
-
           // Neg-binomial likelihood
           nllI_tg(t,g) -= dnbinom_robust(E_dtg(d,t,g),log(mu),log(var-mu),TRUE);
         }
 
         // Predicted stock composition
         for( int p=0; p<nP; p++ )
-          Phat_pdtg(p,d,t,g) = exp(lnqE_pg(p,g))*J_dpt(d,p,t)/Ihat_dtg(d,t,g);
+          Phat_pdtg(p,d,t,g) = exp(lnqE_pg(p,g))*J_dptg(d,p,t,g)/Ihat_dtg(d,t,g);
 
         // Multinomial likelihood for composition data
         if( !isNA(n_pdtg(0,d,t,g)) )
@@ -448,8 +445,6 @@ Type objective_function<Type>::operator() ()
       nllMR -= dnorm( log(I_t(t)),
                       log(mrIhat_t(t)),
                       Isd,
-                      //log(I_t(t))*0.01,
-                      //log(seI_t(t)),
                       TRUE );
     }
 
@@ -466,12 +461,9 @@ Type objective_function<Type>::operator() ()
     if( y > 1 )
       for( int p=0; p<nP; p++ )
         omega_py(p,y) = phi_p(p)*(lnR_py(p,y-1)-log(R_py(p,y-1)));
+    
     for( int p=0; p<nP; p++ )
-    {
-//      if( y > 1 )
-//        nllR_py(p,y) -= dnorm( lnR_py(p,y)-lnR_py(p,y-1), Type(0), recSD_p(p), TRUE );  
       nllR_py(p,y) -= dnorm( lnR_py(p,y), log(R_py(p,y)) + omega_py(p,y)+1e-10, recSD_p(p), TRUE );  
-    }
   }
   
   // Priors ---------------------------------------------------------------- //
@@ -491,24 +483,38 @@ Type objective_function<Type>::operator() ()
   for( int t=0; t<(nT-1); t++ )
     nlp += errDens(arrivErr_pt.col(t));
 
-  //nlp -= dnorm( UMSY_p, Type(0.5), Type(0.5), TRUE ).sum();
-  nlp -= dnorm( logitPhi_p, Type(0), Type(1), TRUE ).sum();
+  nlp -= UMSYPrior(2)   * dnorm( UMSY_p, UMSYPrior(0), UMSYPrior(1), TRUE ).sum();
+  nlp -= phiPrior(1)    * dnorm( logitPhi_p, Type(0), phiPrior(0), TRUE ).sum();
+  nlp -= pearPrior(0,2) * dnorm( pearLambda, pearPrior(0,0), pearPrior(0,1), TRUE );
+  nlp -= pearPrior(1,2) * dnorm( pearTheta,  pearPrior(1,0), pearPrior(1,1), TRUE );
+  nlp -= pearPrior(2,2) * dnorm( pearSigma,  pearPrior(2,0), pearPrior(2,1), TRUE );
+  nlp -= pearPrior(3,2) * dnorm( pearTau,    pearPrior(3,0), pearPrior(3,1), TRUE );  
 
   // Total objective function
   Type objFun = nllC_rht.sum() +
                 nllxB +
                 nllxC_rht.sum() +
                 nllR_py.sum() +
-                weightI*nllMR + 
+                nllMR + 
                 nlp +
-                nllI_tg.sum() +
+                weightI*nllI_tg.sum() +
                 nllP_g.sum() +
                 1e3*varPen;
                 
 
   // REPORT SECTION -------------------------------------------------------- //
-  ADREPORT(errSD_p);
+  ADREPORT(runSize_pt);
+  ADREPORT(runSize_t);
+  ADREPORT(borderPass_t);
   ADREPORT(mu_pt);
+  ADREPORT(SMSY_p);
+  ADREPORT(UMSY_p);
+  ADREPORT(pFem_y);
+  ADREPORT(phi_p);
+  ADREPORT(relReproOutput_t);
+  ADREPORT(recSD_p);
+  ADREPORT(errSD_p);
+  ADREPORT(meanMu_p);
 
   // Data and controls
   REPORT(n_pdtg);
@@ -525,6 +531,8 @@ Type objective_function<Type>::operator() ()
   REPORT(xC_arht);
   REPORT(z_ast);
   REPORT(etaSD);
+  REPORT(phiPrior);
+  REPORT(pearPrior);
 
   // Dimensions
   REPORT(nA);
@@ -555,11 +563,12 @@ Type objective_function<Type>::operator() ()
   REPORT(pearPars);
   REPORT(logitPhi_p);
   REPORT(logitpFem_y);
+  REPORT(pFem_y);
   REPORT(lnpFemSD);
 
   // Latent parameters
-  REPORT(J_dt);
-  REPORT(J_dpt);
+  //REPORT(J_dt);
+  REPORT(J_dptg);
   REPORT(mu_pt);
   REPORT(rho_dpt);
   REPORT(lnqE_pg);
@@ -585,6 +594,8 @@ Type objective_function<Type>::operator() ()
   REPORT(pearTheta);
   REPORT(pearLambda);
   REPORT(phi_p);
+  REPORT(runSize_pt);
+  REPORT(relReproOutput_t);
 
   // Model predictions
   REPORT(Ihat_dtg);
@@ -601,7 +612,6 @@ Type objective_function<Type>::operator() ()
   REPORT(nllxB);
   REPORT(nlp);
   REPORT(nllR_py);
-  //REPORT(cov_ss);
   REPORT(varPen);
 
   return objFun;

@@ -1,12 +1,30 @@
-######################################################################
-# procData.R
-#
-# Generate R data file for Yukon River run reconstruction for fitRR.R
-#
-# June 7, 2019
-# Authors: Beau Doherty, Steve Rossi, Sean Cox
-# Landmark Fisheries Research
-######################################################################
+#-----------------------------------------------------------------------------#
+# processData.R                                                               #
+# Plotting script for integrated Yukon River Chinook run reconstruction       #
+#                                                                             #
+# Copyright 2023 by Landmark Fisheries Research, Ltd.                         #
+#                                                                             #
+# This software is provided to DFO in the hope that it will be                #
+# useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                        #
+#                                                                             #
+# ALL INTELLECTUAL PROPERTY REMAINS WITH LANDMARK FISHERIES RESEARCH, LTD.    #
+# THIS SOFTWARE MAY NOT BE REDISTRIBUTED, SUBLICENCED, COPIED, OR SHARED      #
+# OUTSIDE OF ESSA TECHNOLOGIES WITHOUT THE EXPRESS WRITTEN CONSENT OF         #
+# LANDMARK FISHERIES RESEARCH, LTD.                                           #
+#                                                                             #
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" #
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE   #
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE  #
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE    #
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR         #
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF        #
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS    #
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN     #
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)     #
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE  #
+# POSSIBILITY OF SUCH DAMAGE.                                                 #
+#-----------------------------------------------------------------------------#
 
 library(dplyr)
 
@@ -58,7 +76,7 @@ processData <- function(ctlFile="estControlFile.txt")
   getAge <- function(x="Age1.1")
   {
     y <- gsub("[^0-9.-]", "", x)
-    eval(parse(text=gsub("\\.","+",y)))
+    eval(parse(text=gsub("\\.","+",y)))+1
   }
 
 
@@ -117,7 +135,8 @@ processData <- function(ctlFile="estControlFile.txt")
              melt( id=c("Year","Fishery.type","River.Section") ) %>%
              filter( Year %in% yrs ) %>%
              mutate( age=mapply(getAge,variable),
-                     age=ifelse(age<4,4,age),
+                     age=ifelse(age<ages[1],ages[1],age),
+                     age=ifelse(age>ages[nA],ages[nA],age),
                      River.Section=sapply(River.Section,assignr),
                      Fishery.type=match(Fishery.type,fisheryType) ) %>%
              group_by( Year, Fishery.type, River.Section, age ) %>%
@@ -143,7 +162,8 @@ processData <- function(ctlFile="estControlFile.txt")
                     Year %in% yrs ) %>%
             melt( id=c("Year","Sex","Gear") ) %>%
             mutate( age=mapply(getAge,variable),
-                    age=ifelse(age<4,4,age),
+                    age=ifelse(age<ages[1],ages[1],age),
+                    age=ifelse(age>ages[nA],ages[nA],age),
                     Sex=ifelse(Sex=="male",1,2),
                     Gear=ifelse(Gear=="Fishwheel",1,2),
                     j=ifelse(Sex==1,0,4),
@@ -164,20 +184,32 @@ processData <- function(ctlFile="estControlFile.txt")
               melt( id=c("Year","Sex","Gear","Length.Measurement.Type"),
                     value.name="Length" ) %>%
               mutate( Age=mapply(getAge,variable),
-                      Sex=ifelse(Sex=="male",1,2), ) %>%
+                      Sex=ifelse(Sex=="male",1,2) ) %>%
                       #age=ifelse(age<4,4,age) ) %>%
               filter( Length>0,
-                      Age>=4 ) %>%
+                      Age%in%ages ) %>%
               mutate( Length=if_else(condition=Length.Measurement.Type=="Tip of snout to fork of tail",
                                      true=1.446+0.898*Length,
                                      false=Length)) %>%
               acast( Age~Sex~Year, value.var="Length", fun.aggregate=mean )
 
-  rawMETF_ast[4,1,"1998"] <- NaN
+  corrMETF_ast <- read.csv("data/asl/fish-wheel-sel-weighted-length.csv") %>%
+                  filter( sampleYear %in% yrs ) %>%
+                  mutate( Sex=if_else(Sex=="male",1,2) ) %>%
+                  melt( id=c("sampleYear","Sex"),
+                        value.name="Length" ) %>%
+                  rename( age=variable ) %>%
+                  mutate( age=extract_numeric(age) ) %>%
+                  acast( age~Sex~sampleYear, value.var="Length", fun.aggregate=mean )
+
+rawMETF_ast[ , ,dimnames(rawMETF_ast)[[3]] %in% dimnames(corrMETF_ast)[[3]]] <- corrMETF_ast
+
+  #rawMETF_ast[4,1,"1998"] <- NaN
 
   METF_ast <- rawMETF_ast
 
-  par( mfcol=c(4,2), mar=c(0.5,0.5,0,0), oma=c(4,5,1,5) )
+  pdf( file="METF.pdf", height=7, width=6.5 )
+  par( mfcol=c(4,2), mar=c(0.5,0.5,0,0), oma=c(4,5,1,1) )
   labs <- c("Male","Female")
   laba <- 4:7
   gap <- c(8,10,6,20)
@@ -197,17 +229,21 @@ processData <- function(ctlFile="estControlFile.txt")
       box()
       points( x=x, y=y, pch=16 )
 
-      if( a<dim(METF_ast)[1] )
-      {
+      #if( a<dim(METF_ast)[1] )
+      #{
         abline( fit )
         METF_ast[a,s,is.na(y)] <- predict.lm(fit,data.frame(x=x[is.na(y)]))
-      }
-      else
-      {
-        mn <- mean(y,na.rm=TRUE)
-        METF_ast[a,s,is.na(y)] <- mn
-        abline( h=mn )
-      }
+
+        legend( x="topright", bty="n",
+                legend=paste("b =",format(round(fit$coefficients[2],2),nsmall=2)) )
+
+      #}
+      #else
+      #{
+      #  mn <- mean(y,na.rm=TRUE)
+      #  METF_ast[a,s,is.na(y)] <- mn
+      #  abline( h=mn )
+      #}
       
       if( a<4 )
         axis( side=1, labels=NA )
@@ -223,10 +259,13 @@ processData <- function(ctlFile="estControlFile.txt")
       par(font=1)
     }
   }
+  mtext( side=1, text="Year", outer=TRUE, line=2.5 )
+  mtext( side=2, text="Fish length (METF; mm)", outer=TRUE, line=3.5 )
+  dev.off()
 
   zEggNum_ast  <- 0*METF_ast
   zEggMass_ast <- 0*METF_ast
-  zEggNum_ast[ ,2, ]  <- 9.3e-4*METF_ast[ ,2, ]^2.36
+  zEggNum_ast[ ,2, ]  <- 9.3e-4*METF_ast[ ,2, ]^2.36 # Ohlberger et al. (2020)
   zEggMass_ast[ ,2, ] <- 8.7e-12*METF_ast[ ,2, ]^4.83
 
   mmPerInch <- 25.4 

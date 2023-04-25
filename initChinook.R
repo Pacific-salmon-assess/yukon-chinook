@@ -1,8 +1,8 @@
 #-----------------------------------------------------------------------------#
 # initRR.R                                                                    #
-# Initialization script for Yukon River Chinook run reconstruction            #
+# Initialization script for integrated Yukon River Chinook run reconstruction #
 #                                                                             #
-# Copyright 2019 by Landmark Fisheries Research, Ltd.                         #
+# Copyright 2023 by Landmark Fisheries Research, Ltd.                         #
 #                                                                             #
 # This software is provided to DFO in the hope that it will be                #
 # useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      #
@@ -33,14 +33,14 @@ library(dplyr)
 library(reshape2)
 library(parallel)
 library(mvtnorm)
+library(scales)
 
-source("processData.R")   # Data processing
-#source("simRR.R")   # Simulate run reconstruction
+
+source("processData.R")  # Data processing
 source("fitChinook.R")   # Fit run reconstruction
-#source("fitSim.R")  # Fit run reconstruction to simmed data
-#source("calcRunTiming.R")
-source("tools.R")   # Background functions
-source("plot.R")    # Plotting functions
+source("tools.R")   	 # Background functions
+source("plot.R")    	 # Plotting functions
+source("ypr.R")    		 # Yield-per-recruit analysis
 
 # Compile TMB objective function
 loadModel("yukonChinookIntegrated")

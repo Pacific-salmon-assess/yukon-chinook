@@ -1,8 +1,8 @@
 #-----------------------------------------------------------------------------#
 # tools.R                                                                     #
-# Helper functions for Yukon River Chinook run reconstruction                 #
+# Helper functions for integrated Yukon River Chinook run reconstruction      #
 #                                                                             #
-# Copyright 2019 by Landmark Fisheries Research, Ltd.                         #
+# Copyright 2023 by Landmark Fisheries Research, Ltd.                         #
 #                                                                             #
 # This software is provided to Essa Technologies in the hope that it will be  #
 # useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      #
@@ -25,6 +25,45 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE  #
 # POSSIBILITY OF SUCH DAMAGE.                                                 #
 #-----------------------------------------------------------------------------#
+
+getParSummary <- function( folder="fits/mod1" )
+{
+  load(paste0(folder,"/rpt.Rdata"))
+  z <- data.frame( stock = rpt$stocks,
+                   UMSY = format(round(filter(rpt$sdrpt,par=="UMSY_p")$val,2),nsmall=2),
+                   UMSYse = format(round(filter(rpt$sdrpt,par=="UMSY_p")$se,2),nsmall=2),
+                   SMSY = round(filter(rpt$sdrpt,par=="SMSY_p")$val),
+                   SMSYse = round(filter(rpt$sdrpt,par=="SMSY_p")$se),
+                   recSD = format(round(filter(rpt$sdrpt,par=="recSD_p")$val,2),nsmall=2),
+                   recSDse = format(round(filter(rpt$sdrpt,par=="recSD_p")$se,2),nsmall=2),
+                   phi = format(round(filter(rpt$sdrpt,par=="phi_p")$val,2),nsmall=2),
+                   phise = format(round(filter(rpt$sdrpt,par=="phi_p")$se,2),nsmall=2),
+                   errSD = format(round(filter(rpt$sdrpt,par=="errSD_p")$val,3),nsmall=3),
+                   errSDse = format(round(filter(rpt$sdrpt,par=="errSD_p")$se,3),nsmall=3),
+                   mu = format(round(filter(rpt$sdrpt,par=="meanMu_p")$val,3),nsmall=3),
+                   muse = format(round(filter(rpt$sdrpt,par=="meanMu_p")$se,3),nsmall=3))
+  write.csv(z,file=paste0(folder,"/parSummary.csv"),row.names=FALSE)
+}
+
+getRunTimingSummary <- function( rpt, folder="." )
+{
+  mu_pt <- rbind(rpt$mu_pt,colMeans(rpt$mu_pt))
+  x <- as.numeric(substr(rpt$years,3,3))
+  x <- match(x,unique(x))
+  z <- data.frame( stock = c(rpt$stocks,"Average"),
+                   y1980s = format(round(rowMeans(mu_pt[ ,x==1]),1),nsmall=1),
+                   y1990s = format(round(rowMeans(mu_pt[ ,x==2]),1),nsmall=1),
+                   y2000s = format(round(rowMeans(mu_pt[ ,x==3]),1),nsmall=1),
+                   y2010s = format(round(rowMeans(mu_pt[ ,x>3]),1),nsmall=1) )
+  write.csv(z,file=paste0(folder,"/runTimingSummary.csv"),row.names=FALSE)
+}
+
+getNLLSummary <- function( rpt )
+{
+  c( C=sum(rpt$nllC_rht), xC=sum(rpt$nllxC_rht), xB=rpt$nllxB, R=sum(rpt$nllR_py),
+     MR=rpt$weightI*rpt$nllMR, nlp=rpt$nlp, I=sum(rpt$nllI_tg), P=sum(rpt$nllP_g),
+     total=rpt$objFun )
+}
 
 loadModel <- function( name )
 {

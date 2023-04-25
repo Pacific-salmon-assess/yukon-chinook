@@ -1,25 +1,107 @@
-# plot.R
-# Plots for Yukon River Chinook run reconstruction
-# Steven Rossi (spr1@sfu.ca), Beau Doherty, Sean Cox
-# June 3, 2019
+#-----------------------------------------------------------------------------#
+# plot.R                                                                      #
+# Plotting script for integrated Yukon River Chinook run reconstruction       #
+#                                                                             #
+# Copyright 2023 by Landmark Fisheries Research, Ltd.                         #
+#                                                                             #
+# This software is provided to DFO in the hope that it will be                #
+# useful, but WITHOUT ANY WARRANTY; without even the implied warranty of      #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                        #
+#                                                                             #
+# ALL INTELLECTUAL PROPERTY REMAINS WITH LANDMARK FISHERIES RESEARCH, LTD.    #
+# THIS SOFTWARE MAY NOT BE REDISTRIBUTED, SUBLICENCED, COPIED, OR SHARED      #
+# OUTSIDE OF ESSA TECHNOLOGIES WITHOUT THE EXPRESS WRITTEN CONSENT OF         #
+# LANDMARK FISHERIES RESEARCH, LTD.                                           #
+#                                                                             #
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" #
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE   #
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE  #
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE    #
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR         #
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF        #
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS    #
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN     #
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)     #
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE  #
+# POSSIBILITY OF SUCH DAMAGE.                                                 #
+#-----------------------------------------------------------------------------#
+
 
 plotAll <- function( rpt, folder="." )
 {
   plotFitI(rpt=rpt,folder=folder)
   #plotTotalRunSize(rpt=rpt,folder=folder)
-  #plotRunSize(rpt=rpt,folder=folder)
+  plotRunSize(rpt=rpt,folder=folder)
   plotArrival(rpt=rpt,folder=folder)
   #plotArrivalByYear(rpt=rpt,folder=folder)
   #plotCompResid(rpt=rpt,folder=folder)
   plotCatchFit(rpt=rpt,folder=folder)
   plotCatchAgeFit(rpt=rpt,folder=folder)
+  plotCatchAgeFitBubble(rpt=rpt,folder=folder)
   plotBorderAgeFit(rpt=rpt,folder=folder)
+  plotBorderAgeFitBubble(rpt=rpt,folder=folder)
   plotBorderPassage(rpt=rpt,folder=folder)
   plotRecruitment(rpt=rpt,folder=folder)
   plotStockRec(rpt=rpt,folder=folder)
   plotSelectivity(rpt=rpt,folder=folder)
+  plotSelectivityAvg(rpt=rpt,folder=folder)
   plotSelectivityByLength(rpt=rpt,folder=folder)
   plotpFem(rpt=rpt,folder=folder)
+  plotProbReturnAtAge(rpt=rpt,folder=folder)
+  plotAvgRunTiming(rpt=rpt,folder=folder)
+}
+
+plotAvgRunTiming <- function( rpt, folder="." )
+{
+  pdf( file=paste(folder,"/fig22-avgRunTiming.pdf",sep=""), height=5, width=7 )
+  cols <- brewer.pal(rpt$nP,"Set1")
+
+  x <- rpt$day_d
+
+  y_dpt <- rpt$rho_dpt
+  y_dp  <- apply( y_dpt, 1:2, mean )
+
+  par(mar=c(5,7,1,1),oma=c(0,0,0,0))
+
+  plot( x=range(x), c(1,rpt$nP+1.5), type="n", axes=FALSE,
+        xlab="Ordinal date", ylab="" )
+  plotbg()
+  axis( side=1 ) 
+  axis( side=2, at=rpt$nP:1, labels=rpt$stocks, las=1, cex.axis=0.6 ) 
+  for( p in 1:rpt$nP )
+  {
+    y <- 1.5*(y_dp[ ,p]/max(y_dp[ ,p]))
+    polygon( x=c(x,rev(x)), y=rpt$nP-p+1+c(y,rep(0,length(x))),
+             border=NA, col=cols[p] )
+  }
+
+  dev.off()
+}
+
+plotAnnualRunTiming <- function( rpt, folder="." )
+{
+  #pdf( file=paste(folder,"/annualRunTiming.pdf",sep=""), height=5, width=7 )
+  cols <- brewer.pal(rpt$nP,"Set1")
+
+  mu_pt <- rpt$mu_pt
+  #for( p in 1:rpt$nP )
+  #  mu_pt[p, ] <- mu_pt[p, ]/mu_pt[p,1]
+
+  #mu_pt <- rpt$arrivErr_pt
+
+  par(mar=c(5,7,1,1),oma=c(0,0,0,0))
+
+  plot( x=range(rpt$years), y=range(mu_pt), type="n", las=1,
+        xlab="Year", ylab="Mean date of arrival (ordinal)" )
+  plotbg()
+  #axis( side=1 ) 
+  #axis( side=2, at=rpt$nP:1, labels=rpt$stocks, las=1, cex.axis=0.6 ) 
+  for( p in 1:rpt$nP )
+  {
+    lines( x=rpt$years, y=mu_pt[p, ], lwd=1.5, col=cols[p] )
+  }
+
+  #dev.off()
 }
 
 plotCompResid <- function( rpt, d=16:100, folder="." )
@@ -88,25 +170,57 @@ bubblePlot <- function( res, main="" )
 
 }
 
+bubblePlot2 <- function( res, xlab="", ylab="", xax=TRUE, yax=TRUE,
+                         x1=1985, xby=10, yby=1, main="",
+                         yaxlab=NULL )
+{
+  colnames(res) <- 1:ncol(res)
+  resDF <- melt(res)
+  colnames(resDF) <- c("x","y","value")
+  resDF <- as.data.frame(resDF) %>%
+           filter( value != 0 ) %>%
+           mutate( col    = ifelse( value>0, "black", "grey" ),
+                   bg     = ifelse( value>0, NA, scales::alpha("grey",0.6) ),
+                   radius = abs(value) )
+  plot( x=c(1,nrow(res)), y=c(0,ncol(res)+1), type="n", xlab=xlab, ylab=ylab, axes=FALSE, main=main )
+  if(xax)
+    axis( side=1, at=seq(1,nrow(res),by=xby), labels=seq(x1,x1-1+nrow(res),by=xby) )
+  axis( side=1, at=seq(1,nrow(res),by=xby), labels=FALSE )
+  
+  if( yax )
+  {
+    if( is.null(yaxlab) )
+      axis( side=2, las=2 )
+    else
+      axis( side=2, las=2, at=1:ncol(res), labels=yaxlab )
+  }
+  else
+    axis( side=2, labels=NA )
+  box()
+
+  symbols( x=resDF$x, y=resDF$y, circles=resDF$radius, add=TRUE, inches=0.07, bg=resDF$bg, fg=resDF$col )
+
+}
+
 plotFitI <- function( rpt, folder="." )
 {
-  dims <- list( c(4,6), c(3,4) )
-  hei <- c(6,8)
-  wid <- c(8,11)
-  ylab <- c("Abundance (1000s)","Relative abundance")
+  dims <- list( c(4,6), c(3,6) )
+  hei <- c(6,5)
+  wid <- c(8,8)
+  #ylab <- c("Abundance (1000s)","Relative abundance")
 
   lims <- list( c(18,76), c(15,111) )
 
   z <- 0
   for( g in 1:rpt$nG )
   {
-    pdf( file=paste(folder,"/indexFitsg",g,".pdf",sep=""),
+    pdf( file=paste(folder,"/fig",g+12,"indexFitsg",g,".pdf",sep=""),
          height=hei[g], width=wid[g] )
-    par( mfrow=dims[[g]], mar=c(2,2,1,1), oma=c(0,3,0,0) )
+    par( mfrow=dims[[g]], mar=c(2,2,1,1), oma=c(3,3,0,0) )
     for( t in 1:rpt$nT )
     {
-      I_d <- 1e-3*rpt$E_dtg[ ,t,g]
-      E_d <- 1e-3*rpt$Ihat_dtg[ ,t,g]
+      I_d <- 1e-3*rpt$E_dtg[ ,t,g]/exp(rpt$lnqE_pg[1,g])
+      E_d <- 1e-3*rpt$Ihat_dtg[ ,t,g]/exp(rpt$lnqE_pg[1,g])
       if( sum(!is.na(I_d))>0 )
       {
         plot( x=rpt$day_d, y=I_d, xlim=rpt$day_d[lims[[g]]],
@@ -119,8 +233,8 @@ plotFitI <- function( rpt, folder="." )
       }
     } # next t
 
-    mtext( side=2, outer=TRUE, line=1,
-           text=ylab[g] )
+    mtext( side=1, outer=TRUE, line=1.5, text="Ordinal date" )
+    mtext( side=2, outer=TRUE, line=1.5, text="Abundance (1000s)" )
     dev.off()
   } # next g
 }
@@ -195,7 +309,7 @@ plotMrFit <- function( rpt )
 
 plotBorderPassage <- function( rpt, folder="." )
 {
-  pdf( file=paste(folder,"/borderPassage.pdf",sep=""), height=5, width=7 )
+  pdf( file=paste(folder,"/fig12-borderPassage.pdf",sep=""), height=5, width=7 )
 
   par( mar=c(3,5,1,1) )
 
@@ -207,11 +321,29 @@ plotBorderPassage <- function( rpt, folder="." )
   sonarN_t <- colSums(rpt$E_dtg[ ,t,2],na.rm=1)*1e-3
   ymax <- max(I_t,E_t,sonarN_t,na.rm=TRUE)
 
+  if( is.finite(rpt$sdrpt[1,5]) )
+  {
+    Rse <- filter(rpt$sdrpt,par=="borderPass_t")
+    Rlow_t <- Rse$lCI*1e-3
+    Rupp_t <- Rse$uCI*1e-3
+  }
+  else
+  {
+    Rlow_t <- NA*I_t
+    Rupp_t <- NA*I_t
+  }
+
+  sonarN_t[sonarN_t==0] <- NA
+
   plot( x=yr, y=I_t, type="n", las=1, yaxs="i", xlab="",
         ylab="Total border passage (1000s)", ylim=c(0,1.1*ymax) )
   grid()
   box()
   
+  segments( x0=yr,
+            y0=Rlow_t, y1=Rupp_t,
+                col="grey80", lwd=2.5 )
+
   points( x=yr, y=E_t, pch=16, col="grey40" )
   points( x=yr, y=I_t, pch=0, lwd=1.5 )
   points( x=yr, y=sonarN_t, pch=1, lwd=1.5, col="red" )
@@ -265,54 +397,6 @@ plotTotalRunSize <- function( rpt, folder="." )
   dev.off()
 }
 
-plotTotalRunSizeMulti <- function( rptFiles=c("mod1test2/rpt.Rdata",
-                                              "mod2test2/rpt.Rdata",
-                                              "mod3test2/rpt.Rdata") )
-{
-  load(rptFiles[1])
-
-  pdf( file="totalRunSize.pdf", height=5, width=7 )
-
-  cols <- brewer.pal(9,"Blues")[c(4,5,7)]
-
-  par( mar=c(3,5,1,1) )
-
-  #t <- !is.na(rpt$I_t)
-  t <- rep(TRUE,rpt$nT)
-  yr  <- rpt$years[t]
-  I_t <- rpt$I_t[t]*1e-3/exp(rpt$lnqI_s)
-  sonarN_t <- colSums(rpt$E_dtg[ ,t,1])*1e-3
-  ymax <- max(I_t,sonarN_t,na.rm=TRUE)
-
-  plot( x=yr, y=I_t, type="n", las=1, yaxs="i", xlab="",
-        ylab="Total run size (1000s)", ylim=c(0,120) )
-  grid()
-  box()
-  
-  jtr <- c(-0.2,0,0.2)
-
-  for( i in 1:3 )
-  {
-    load(rptFiles[i])
-    E_t <- colSums(exp(rpt$lnRunSize_st))[t]*1e-3
-    Ese <- filter(rpt$sdrpt,par=="runSize_t")[t, ]
-    segments( x0=yr+jtr[i], y0=Ese$lCI*1e-3, y1=Ese$uCI*1e-3, col=cols[i], lwd=2 )
-    points( x=yr+jtr[i], y=E_t, col="black", pch=14+i, cex=0.5 )
-  }
-
-
-  points( x=yr, y=I_t, pch=0, lwd=1.5 )
-  points( x=yr, y=sonarN_t, pch=1, lwd=1.5, col="red" )
-
-  legend( x="bottomleft", bty="n",
-          legend=c("Run reconstruction estimates","Mark-recapture estimates","Sonar counts"),
-          pch=c(NA,NA), lwd=c(0,4), col=c("grey70","black","red"), lty=c(1,0,0) )
-  legend( x="bottomleft", bty="n",
-          legend=c("Run reconstruction estimates","Mark-recapture estimates","Sonar counts"),
-          pch=c(16,0,1), lwd=c(1.5,1.5), col=c("grey40","black","red"), lty=c(0,0,0) )
-
-  dev.off()
-}
 
 plotFig6 <- function( rptFiles=c("mod1test2/rpt.Rdata",
                                  "mod2test2/rpt.Rdata",
@@ -381,13 +465,13 @@ plotFig6 <- function( rptFiles=c("mod1test2/rpt.Rdata",
 plotRunSize <- function( rpt, folder="." )
 {
   x <- rpt$years
-  runSize_st <- exp(rpt$lnRunSize_st)*1e-3
+  runSize_pt <- rpt$runSize_pt*1e-3
 
   if( is.finite(rpt$sdrpt[1,5]) )
   {
-    Rse <- filter(rpt$sdrpt,par=="runSize_st")
-    Rlow_st <- matrix( data=Rse$lCI*1e-3, nrow=rpt$nS, ncol=rpt$nT )
-    Rupp_st <- matrix( data=Rse$uCI*1e-3, nrow=rpt$nS, ncol=rpt$nT )
+    Rse <- filter(rpt$sdrpt,par=="runSize_pt")
+    Rlow_pt <- matrix( data=Rse$lCI*1e-3, nrow=rpt$nP, ncol=rpt$nT )
+    Rupp_pt <- matrix( data=Rse$uCI*1e-3, nrow=rpt$nP, ncol=rpt$nT )
 
     Rse_t <- filter(rpt$sdrpt,par=="runSize_t")
     Rlow_t <- Rse_t$lCI*1e-3
@@ -395,46 +479,58 @@ plotRunSize <- function( rpt, folder="." )
   }
   else
   {
-    Rlow_st <- matrix( data=NA, nrow=rpt$nS, ncol=rpt$nT )
-    Rupp_st <- matrix( data=NA, nrow=rpt$nS, ncol=rpt$nT )
+    Rlow_pt <- matrix( data=NA, nrow=rpt$nP, ncol=rpt$nT )
+    Rupp_pt <- matrix( data=NA, nrow=rpt$nP, ncol=rpt$nT )
     Rlow_t <- rep(NA,rpt$nT)
     Rupp_t <- rep(NA,rpt$nT)
   }
+  
 
-  pdf( file=paste(folder,"/runSize.pdf",sep=""), height=6.5, width=8 )
-  par( mfrow=c(3,3), mar=c(3,2,2,1), oma=c(0,2,0,0) )
+  pdf( file=paste(folder,"/fig15-runSize.pdf",sep=""), height=6.5, width=8 )
+  par( mfrow=c(3,3), mar=c(0.5,3,0,0), oma=c(4,2,1,1) )
 
-  for( s in 1:rpt$nS )
+  for( p in 1:rpt$nP )
   {
-    plot( x=range(x), y=c(0,1.1*max(runSize_st[s,],Rupp_st[s,],na.rm=TRUE)),
-          type="n", las=1, main=rpt$stocks[s], yaxs="i" )
+    plot( x=range(x), y=c(0,1.1*max(runSize_pt[p,],Rupp_pt[p,],na.rm=TRUE)),
+          type="n", axes=FALSE, ylab="" )
+    if( p < 7 )
+      axis( side=1, labels=NA )
+    else
+      axis( side=1 )
+    axis( side=2, las=1 )
     grid()
     box()
-    segments( x0=x, y0=Rlow_st[s, ], y1=Rupp_st[s, ], col="grey70", lwd=4 )
-    points( x=x, y=runSize_st[s, ], pch=16 )
+    segments( x0=x, y0=Rlow_pt[p, ], y1=Rupp_pt[p, ], col="grey70", lwd=4 )
+    points( x=x, y=runSize_pt[p, ], pch=16 )
+    par(font=2)
+    legend(x="topright",legend=rpt$stocks[p],bty="n")
+    par(font=1)
   }
 
-  runSize_t <- colSums(runSize_st)
+  runSize_t <- colSums(runSize_pt)
 
   plot( x=range(x), y=c(0,1.1*max(runSize_t,Rupp_t,na.rm=1)),
-        type="n", las=1, main="Total", yaxs="i" )
+        type="n", las=1, yaxs="i" )
   grid()
   box()
   segments( x0=x, y0=Rlow_t, y1=Rupp_t, col="grey70", lwd=4 )
   points( x=x, y=runSize_t, pch=16 )
+  par(font=2)
+  legend(x="topright",legend="Total",bty="n")
+  par(font=1)
 
+  mtext( side=1, text="Year", outer=TRUE, line=2.5 )
   mtext( side=2, text="Run size ('000s)", outer=TRUE, line=0.5 )
 
   dev.off()
 
 }
 
-plotRunSizeMulti <- function( rptFiles=c("mod1/rpt.Rdata",
-                                         "mod2/rpt.Rdata",
-                                         "mod3/rpt.Rdata")
+plotRunSizeMulti <- function( rptFiles=c("fits/mod1/rpt.Rdata",
+                                         "fits/mod2/rpt.Rdata",
+                                         "fits/mod3/rpt.Rdata")
                             )
 {
-  stks <- c("L.Mstem","W.Donjek","Pelly","Stewart","Carmacks","Teslin","M.Mstem","U.Mstem")
   cols <- brewer.pal(3,"Set1")[c(1,3,2)]
   #col2 <- c(rgb(225,31,39,150,maxColorValue=255),
   #          rgb(59,127,162,150,maxColorValue=255),
@@ -448,41 +544,47 @@ plotRunSizeMulti <- function( rptFiles=c("mod1/rpt.Rdata",
 
   x <- rpt$years
 
-  Rlow_ist <- array( data=NA, dim=c(3,rpt$nS,rpt$nT) )
-  Rmle_ist <- array( data=NA, dim=c(3,rpt$nS,rpt$nT) )
-  Rupp_ist <- array( data=NA, dim=c(3,rpt$nS,rpt$nT) )
+  Rlow_ist <- array( data=NA, dim=c(3,rpt$nP+1,rpt$nT) )
+  Rmle_ist <- array( data=NA, dim=c(3,rpt$nP+1,rpt$nT) )
+  Rupp_ist <- array( data=NA, dim=c(3,rpt$nP+1,rpt$nT) )
   for( i in 1:3 )
   {
     load(rptFiles[i])
-    Rmle_ist[i, , ] <- exp(rpt$lnRunSize_st)*1e-3
-    Rse <- filter(rpt$sdrpt,par=="runSize_st")
-    Rlow_ist[i, , ] <- matrix( data=Rse$lCI*1e-3, nrow=rpt$nS, ncol=rpt$nT )
-    Rupp_ist[i, , ] <- matrix( data=Rse$uCI*1e-3, nrow=rpt$nS, ncol=rpt$nT )
-  }
+    Rmle_ist[i,1:rpt$nP, ] <- rpt$runSize_pt*1e-3
+    Rse <- filter(rpt$sdrpt,par=="runSize_pt")
+    Rlow_ist[i,1:rpt$nP, ] <- matrix( data=Rse$lCI*1e-3, nrow=rpt$nP, ncol=rpt$nT )
+    Rupp_ist[i,1:rpt$nP, ] <- matrix( data=Rse$uCI*1e-3, nrow=rpt$nP, ncol=rpt$nT )
+  
+    Rmle_ist[i,rpt$nP+1, ] <- colSums(rpt$runSize_pt)*1e-3
+    Rse <- filter(rpt$sdrpt,par=="runSize_t")
+    Rlow_ist[i,rpt$nP+1, ] <- Rse$lCI*1e-3
+    Rupp_ist[i,rpt$nP+1, ] <- Rse$uCI*1e-3
 
+  }
   jtr <- c(-0.2,0,0.2)
 
-  pdf( file="runSizeMult.pdf", height=8, width=7 )
-  par( mfrow=c(8,1), mar=c(0,2,0,1), oma=c(2,3,2,2) )
+  stks <- c(rpt$stocks,"Total")
 
-  for( s in 1:rpt$nS )
+  pdf( file="runSizeMult.pdf", height=8, width=7 )
+  par( mfrow=c(rpt$nP+1,1), mar=c(0,2,0,1), oma=c(2,3,2,2) )
+
+  for( s in 1:(rpt$nP+1) )
   {
     ymax <- 1.2*max(Rupp_ist[ ,s,],na.rm=TRUE)
     plot( x=range(x), y=c(0,ymax),
           type="n", axes=FALSE, yaxs="i" )
     grid()
     box()
-    legend( x=1983, y=1.05*ymax, bty="n", legend=stks[s], cex=1.5 )
+    legend( x="topright", bty="n", legend=stks[s], cex=1.5 )
     if( s==1 )
     {
-      legend( x="topright", bty="n", col=cols, pch=NA, lwd=2.5,
-              legend=c("RR_base","RR_oneCor","RR_fullCor") )
-      legend( x="topright", bty="n", col="black", pch=15:17, lwd=0,
-              legend=c("RR_base","RR_oneCor","RR_fullCor") )
+      legend( x="topleft", bty="n", col=cols, pch=NA, lwd=2.5,
+              legend=c("S mod","E mod","EM mod") )
+      legend( x="topleft", bty="n", col="black", pch=15:17, lwd=0,
+              legend=c("S mod","E mod","EM mod") )
       axis( side=3 )
     }
-    if( s == rpt$nS )
-      axis( side=1 )
+      
     if( (s %% 2)==1 )
       axis( side=2, las=1 )
     else
@@ -502,7 +604,9 @@ plotRunSizeMulti <- function( rptFiles=c("mod1/rpt.Rdata",
     }
   }
 
-  mtext( side=2, text="Border passage (1000s)", outer=TRUE, line=1 )
+  axis( side=1 )
+
+  mtext( side=2, text="Run size (1000s)", outer=TRUE, line=1 )
 
   dev.off()
 
@@ -1048,17 +1152,17 @@ plotHarvestDatav1 <- function()
 
 plotCatchFit <- function( rpt, folder="." )
 {
-  obsC_rht <- rpt$obsC_rht
-  C_rht <- apply( rpt$C_asrht, 3:5, sum )
+  obsC_rht <- rpt$obsC_rht*1e-3
+  C_rht <- apply( rpt$C_asrht, 3:5, sum )*1e-3
   x <- rpt$years
 
-  pdf( file=paste0(folder,"/catchFit.pdf"), height=6.5, width=7 )
-  par( mfrow=c(rpt$nR,rpt$nH), mar=c(0.5,3,0,1), oma=c(2,2,1,1) )
+  pdf( file=paste0(folder,"/fig3-catchFit.pdf"), height=6.5, width=7 )
+  par( mfrow=c(rpt$nR,rpt$nH), mar=c(0.5,3,0,1), oma=c(4,3,1,1) )
   for( r in 1:rpt$nR )
   {
     for( h in 1:rpt$nH )
     {
-      plot( x, C_rht[r,h, ], ylim=c(0,max(obsC_rht[r,h, ],C_rht[r,h, ])), axes=FALSE, type="n" )
+      plot( x, C_rht[r,h, ], ylim=c(0,1.1*max(obsC_rht[r,h, ],C_rht[r,h, ])), axes=FALSE, type="n" )
       grid()
       box()
       rect( xleft=x-0.3, xright=x+0.3, ybottom=0, ytop=obsC_rht[r,h, ], col="grey80", border=NA )
@@ -1074,72 +1178,121 @@ plotCatchFit <- function( rpt, folder="." )
       par(font=2)
       legend(x="topright",legend=paste(rpt$regions[r],rpt$fisheryType[h]),bty="n")
       par(font=1)
+      legend( x="topright", legend=c("","Obs.","Est."), pch=c(NA,15,1),
+              col=c("black","grey80","black"), pt.cex=c(1,1.3,1), bty="n" )
     }
   }
+  mtext( side=1, text="Year", outer=TRUE, line=2.5 )
+  mtext( side=2, text="Landings ('000s)", outer=TRUE, line=1.5 )
   dev.off()
 }
 
 plotCatchAgeFit <- function( rpt, folder="." )
 {
+  f <- 6
   x <- 1:rpt$nA
- 
-  pdf( file=paste0(folder,"/catchAgeFit.pdf"), height=8, width=8.2 )
   for( r in 1:rpt$nR )
   {
     for( h in 1:rpt$nH )
     {
-      par( mfrow=c(ceiling(rpt$nT/5),5), mar=c(0,0,0,0), oma=c(4,4,2,1) )
+      tseq <- which(!is.na(rpt$xC_arht[1,r,h, ]))
+      n <- length(tseq)
+      if( n < rpt$nT )
+        ncl <- 9
+      else
+        ncl <- 10
+      pdf( file=paste0(folder,"/fig",f,"-catchAgeFit-r",r,"-h",h,".pdf"), height=4, width=7 )
+      par( mfrow=c(ceiling(n/ncl),ncl), mar=c(0,0,0,0), oma=c(4,4,2,1) )
       obs_at <- rpt$xC_arht[ ,r,h, ]
       est_at <- rpt$xhatC_arht[ ,r,h, ]
-      for( t in 1:rpt$nT )
+      for( t in 1:n )
       {
         plot( x=c(0.5,max(x)+0.5), y=c(0,1.05), type="n", axes=FALSE )
         grid()
         box()
-        rect( xleft=x-0.3, xright=x+0.3, ybottom=0, ytop=obs_at[ ,t]/sum(obs_at[ ,t]), border=NA, col="grey80" )
-        points( x=x, y=est_at[ ,t] )
-        if( t>(rpt$nT-5) )
-          axis( side=1 )
+        rect( xleft=x-0.3, xright=x+0.3, ybottom=0, ytop=obs_at[ ,tseq[t]]/sum(obs_at[ ,tseq[t]]), border=NA, col="grey80" )
+        points( x=x, y=est_at[ ,tseq[t]] )
+        lines( x=x, y=est_at[ ,tseq[t]] )
+        if( t>(n-ncl) )
+        {
+          axis( side=1, at=1:rpt$nA, labels=NA )
+          axis( side=1, at=1:rpt$nA, labels=rpt$ages, cex.axis=0.9, line=-0.2, lty=0 )
+        }
   
-        if( t %% 5 == 1 )
+        if( t %% ncl == 1 )
           axis( side=2, las=1 )
         box()
         legend(x="topright",legend=rpt$years[t],bty="n")
       }
+      plot( x=0, y=0, type="n", axes=FALSE, xlab="", ylab="" )
+      legend( x="bottomright", bty="n", legend=c("Obs.","Est."),
+              col=c("grey80","black"), pch=c(15,1) )
       mtext( side=1, outer=TRUE, line=2.5, text="Age class" )
       mtext( side=2, outer=TRUE, line=2.5, text="Proportion" )  
       mtext( side=3, outer=TRUE, text=paste(rpt$regions[r],rpt$fisheryType[h]) )
+      dev.off()
+      f <- f+1
     }
-  }
-  dev.off() 
+  } 
 }
 
+plotCatchAgeFitBubble <- function( rpt, folder="." )
+{
+  x <- 1:(rpt$nA*2)
+  yaxlab <- rpt$ages
+  pdf( file=paste0(folder,"/catchAgeFitBubble.pdf"), height=7, width=7 )
+  par( mfrow=c(rpt$nR,rpt$nH), mar=c(0.5,0.5,0,0), oma=c(5,4,1,1) )
+  for( r in 1:rpt$nR )
+  {
+    for( h in 1:rpt$nH )
+    {
+      obs_at <- apply( rpt$xC_arht[ ,r,h, ], 2, standardize )
+      est_at <- rpt$xhatC_arht[ ,r,h, ]      
+      res_at <- log(est_at) - log(obs_at)
+      bubblePlot2(t(res_at),xax=r==rpt$nR,yax=h==1,yaxlab=yaxlab)
+    }
+  }
+  mtext( side=1, text="Year", outer=TRUE, line=2.5 )
+  mtext( side=2, text="Age class", outer=TRUE, line=2 )
+  dev.off() 
+}
 
 plotBorderAgeFit <- function( rpt, folder="." )
 {
   x <- 1:(rpt$nA*2)
  
-  labs <- c(paste0("M",1:rpt$nA),paste0("F",1:rpt$nA))
+  labs <- c(paste0("M",rpt$ages),paste0("F",rpt$ages))
 
   for( g in 1:rpt$nG )
   {
-    pdf( file=paste0(folder,"/borderAgeFit",g,".pdf"), height=8, width=8 )
-    par( mfrow=c(ceiling(rpt$nT/5),5), mar=c(0,0,0,0), oma=c(4,4,2,1) )
-    obs_jt <- rpt$xB_jgt[ ,g, ]
-    est_jt <- rbind(rpt$xB_asgt[ ,1,g, ],rpt$xB_asgt[ ,2,g, ])
-    for( t in 1:rpt$nT )
+    tseq <- which(!is.na(rpt$xB_jgt[1,g, ]))
+    n <- length(tseq)
+    pdf( file=paste0(folder,"/fig",g+3,"-borderAgeFit",g,".pdf"), height=6, width=7 )
+    par( mfrow=c(ceiling(n/4),4), mar=c(0,0,0,0), oma=c(4,4,2,1) )
+    obs_jt <- rpt$xB_jgt[ ,g,tseq]
+    est_jt <- rbind(rpt$xB_asgt[ ,1,g,tseq],rpt$xB_asgt[ ,2,g,tseq])
+    for( t in 1:n )
     {
-      plot( x=c(0.5,max(x)+0.5), y=c(0,1.05), type="n", axes=FALSE )
+      plot( x=c(0.5,max(x)+0.5), y=c(0,0.85), type="n", axes=FALSE )
+      grid()
+      box()
       rect( xleft=x-0.3, xright=x+0.3, ybottom=0, ytop=obs_jt[ ,t]/sum(obs_jt[ ,t]), border=NA, col="grey80" )
       points( x=x, y=est_jt[ ,t] )
-      if( t>(rpt$nT-5) )
-        axis( side=1, at=1:(2*rpt$nA), labels=labs, cex.axis=0.8 )
+      lines( x=x, y=est_jt[ ,t] )
+      if( t>(n-4) )
+      {
+        axis( side=1, at=1:(2*rpt$nA), labels=NA)
+        axis( side=1, at=1:(2*rpt$nA), labels=labs, cex.axis=0.65, line=-0.25, lty=0 )
+      }
 
-      if( t %% 5 == 1 )
+      if( t %% 4 == 1 )
         axis( side=2, las=1 )
       box()
-      legend(x="topright",legend=rpt$years[t],bty="n")
+      legend(x="topright",legend=rpt$years[tseq[t]],bty="n")
     }
+    plot( x=0, y=0, type="n", axes=FALSE, xlab="", ylab="" )
+    legend( x="bottomright", bty="n", legend=c("Obs.","Est."),
+              col=c("grey80","black"), pch=c(15,1) )
     mtext( side=3, outer=TRUE, text=rpt$gears[g], line=0.2 )
     mtext( side=1, outer=TRUE, line=2.5, text="Age/sex class" )
     mtext( side=2, outer=TRUE, line=2.5, text="Proportion" )  
@@ -1147,6 +1300,26 @@ plotBorderAgeFit <- function( rpt, folder="." )
   }
 }
 
+
+plotBorderAgeFitBubble <- function( rpt, folder="." )
+{
+  x <- 1:(rpt$nA*2)
+  yaxlab <- c(paste0("M",rpt$ages),paste0("F",rpt$ages))
+  labs <- c(paste0("M",1:rpt$nA),paste0("F",1:rpt$nA))
+  pdf( file=paste0(folder,"/borderAgeFitBubble.pdf"), height=5, width=6 )
+  par( mfrow=c(2,1), mar=c(0.5,2,0,0), oma=c(3,3,1,1) )
+  for( g in 1:rpt$nG )
+  {
+    obs_jt <- rpt$xB_jgt[ ,g, ]
+    obs_jt <- apply( obs_jt, 2, standardize )
+    est_jt <- rbind(rpt$xB_asgt[ ,1,g, ],rpt$xB_asgt[ ,2,g, ])
+    res_jt <- log(est_jt) - log(obs_jt)
+    bubblePlot2(t(res_jt),xax=g==rpt$nG,yaxlab=yaxlab)
+  }
+  mtext( side=1, text="Year", outer=TRUE, line=2 )
+  mtext( side=2, text="Age/sex class", outer=TRUE, line=2 )
+  dev.off() 
+}
 
 plotRecruitment <- function( rpt, folder="." )
 {
@@ -1187,39 +1360,104 @@ plotSelectivity <- function( rpt, folder="." )
   par( mfrow=c(ceiling(rpt$nT/5),5), mar=c(0,0,0,0), oma=c(4,6,2,1) )
   for( t in 1:rpt$nT )
   {
-    plot( x=c(1,rpt$nA), y=c(0,1), type="n", axes=FALSE )
-    grid()
+    plot( x=range(rpt$ages)+c(-0.25,0.25), y=c(0,1.08), type="n", axes=FALSE )
+    grid(ny=rpt$nA)
     box()
     for( m in 1:rpt$nM )
     {
-      lines( x=1:rpt$nA, y=v_astm[ ,1,t,m], col=cols[m] )
-      lines( x=1:rpt$nA, y=v_astm[ ,2,t,m], col=cols[m], lty=2 )
+      lines( x=rpt$ages, y=v_astm[ ,1,t,m], col=cols[m] )
+      lines( x=rpt$ages, y=v_astm[ ,2,t,m], col=cols[m], lty=2 )
     }
     legend(x="bottomleft",legend=rpt$years[t],bty="n")
 
     if( t>(rpt$nT-5) )
-      axis(side=1)
+      axis(side=1,at=rpt$ages)
     if( t %% 5 == 1 )
       axis( side=2, las=1 )
   }
   plot( x=0,y=0,axes=FALSE,type="n" )
-  labs <- c(paste0(rpt$meshSizes, "in, Male"),paste0(rpt$meshSizes, "in, Female"))
-  legend( x="topright", legend=labs, bty="n", col=c(cols,cols),
-          lty=c(rep(1,3),rep(2,3)) )
+  labs <- c(paste(rpt$meshSizes, "in, Male"))
+  legend( x="bottomright", legend=labs, bty="n", col=c(cols),
+          lty=c(rep(1,3)) )
+  plot( x=0,y=0,axes=FALSE,type="n" )
+  labs <- c(paste(rpt$meshSizes, "in, Female"))
+  legend( x="bottomright", legend=labs, bty="n", col=c(cols),
+          lty=c(rep(2,3)) )
 
-  mtext( side=1, outer=TRUE, line=2.5, text="Year" )
+  mtext( side=1, outer=TRUE, line=2.5, text="Age (yr)" )
+  mtext( side=2, outer=TRUE, line=4.5, text="Selectivity" )  
+  dev.off() 
+}
+
+plotSelectivityAvg <- function( rpt, folder="." )
+{
+  v_astm <- rpt$v_astm
+
+  vAll_asm <- apply( rpt$v_astm, c(1,2,4), mean )
+  vf10_asm <- apply( rpt$v_astm[ , ,1:10, ], c(1,2,4), mean )
+  vl10_asm <- apply( rpt$v_astm[ , ,(rpt$nT-9):rpt$nT, ], c(1,2,4), mean )
+
+  cols <- brewer.pal(3,"Set1")
+  cols <- c(cols[1],"black",cols[2])
+  pdf( file=paste0(folder,"/fig17-selectivityAvg.pdf"), height=5.5, width=3.5 )
+  par( mfrow=c(3,1), mar=c(0.5,0,0,0), oma=c(4,6,2,1) )
+  
+  for( m in 1:rpt$nM )
+  {
+    plot( x=range(rpt$ages), y=c(0,1.08), type="n", axes=FALSE )
+    axis( side=1, labels=NA, at=rpt$ages )
+    axis( side=2, las=1 )
+    plotbg()
+    points( x=rpt$ages, y=vf10_asm[ ,1,m]/max(vf10_asm[ ,1,m]), col=cols[1], pch=16, cex=1.1 )
+    lines( x=rpt$ages, y=vf10_asm[ ,1,m]/max(vf10_asm[ ,1,m]), col=cols[1] )
+    points( x=rpt$ages, y=vf10_asm[ ,2,m]/max(vf10_asm[ ,2,m]), col=cols[1], pch=18, cex=1.1 )
+    lines( x=rpt$ages, y=vf10_asm[ ,2,m]/max(vf10_asm[ ,2,m]), col=cols[1], lty=2 )
+
+    points( x=rpt$ages, y=vAll_asm[ ,1,m]/max(vAll_asm[ ,1,m]), col=cols[2], pch=16, cex=1.1 )
+    lines( x=rpt$ages, y=vAll_asm[ ,1,m]/max(vAll_asm[ ,1,m]), col=cols[2] )
+    points( x=rpt$ages, y=vAll_asm[ ,2,m]/max(vAll_asm[ ,2,m]), col=cols[2], pch=18, cex=1.1 )
+    lines( x=rpt$ages, y=vAll_asm[ ,2,m]/max(vAll_asm[ ,2,m]), col=cols[2], lty=2 )
+
+    points( x=rpt$ages, y=vl10_asm[ ,1,m]/max(vl10_asm[ ,1,m]), col=cols[3], pch=16, cex=1.1 )
+    lines( x=rpt$ages, y=vl10_asm[ ,1,m]/max(vl10_asm[ ,1,m]), col=cols[3] )
+    points( x=rpt$ages, y=vl10_asm[ ,2,m]/max(vl10_asm[ ,2,m]), col=cols[3], pch=18, cex=1.1 )
+    lines( x=rpt$ages, y=vl10_asm[ ,2,m]/max(vl10_asm[ ,2,m]), col=cols[3], lty=2 )
+
+    par(font=2)
+    legend(x="bottomleft",legend=paste(rpt$meshSizes[m],"in. mesh"),bty="n")
+    par(font=1)
+
+    legend( x=5.2, y=0.3, bty="n", pt.cex=1.1,
+            pch=c(16,18), col=c("black","black"), lty=c(1,2),
+            legend=c("Male","Female") )
+    legend( x=6.1, y=0.4, bty="n",
+            pch=c(15,15,15), col=cols,
+            legend=c("First 10 yrs","All yrs", "Last 10 yrs") )
+
+  }
+  axis( side=1, at=rpt$ages )
+
+  mtext( side=1, outer=TRUE, line=2.5, text="Age (yr)" )
   mtext( side=2, outer=TRUE, line=4.5, text="Selectivity" )  
   dev.off() 
 }
 
 
-plotStockRec <- function( rpt, folder="." )
+plotStockRec <- function( rpt, folder=".", sType=1 )
 {
   S_pt <- rpt$Z_pt
   R_py <- exp(rpt$lnR_py)
 
-  cols <- brewer.pal(rpt$nM,"Set1")
-  pdf( file=paste0(folder,"/stockRec.pdf"), height=7, width=6 )
+  x <- as.numeric(substr(rpt$years,3,3))
+  x <- match(x,unique(x))
+
+  cols <- c( rgb(225,31,39,maxColorValue=255),
+             rgb(251,173,104,maxColorValue=255),
+             rgb(255,254,76,maxColorValue=255),
+             rgb(172,217,232,maxColorValue=255),
+             rgb(71,118,178,maxColorValue=255) )
+  
+  pdf( file=paste0(folder,"/fig20-stockRec.pdf"), height=7, width=6 )
   par( mfrow=c(ceiling(rpt$nP/2),2), mar=c(3,4,0,0), oma=c(2,2,1,1) )
   for( p in 1:rpt$nP )
   {
@@ -1231,18 +1469,33 @@ plotStockRec <- function( rpt, folder="." )
       S[y] <- S_pt[p,y-7]
     }
 
-    plot( x=c(0,1.1*max(S*1e-3,na.rm=1)), y=c(0,1.1*max(R*1e-3,na.rm=1)),
+    plot( x=c(0,1.1*max(S*1e-3,na.rm=1)), y=c(0,1.15*max(R*1e-3,na.rm=1)),
           las=1, xlab="", ylab="", type="n" )
-    grid()
-    box()
+    plotbg()
+    points( x=S*1e-3, y=R*1e-3, col=cols[x], pch=16 )
     points( x=S*1e-3, y=R*1e-3 )
     S <- seq(from=0,to=1.2*max(S,na.rm=1),length.out=1e4)
     R <- rpt$alpha_p[p]*S*exp(-rpt$beta_p[p]*S)
     lines(S*1e-3,R*1e-3)
+    par(font=2)
     legend(x="topright",legend=rpt$stocks[p],bty="n")
+    par(font=1)
+    if(p==1)
+    {
+      legend( x="topright", legend=c("","1980s","1990s","2000s","2010s","2020s"),
+          col=c(NA,cols), pch=16, cex=0.95, bty="n", lty=0 ) 
+      legend( x="topright", legend=c("","1980s","1990s","2000s","2010s","2020s"),
+          bty="n", pch=c(NA,rep(1,5)), cex=0.95 ) 
+    }
   }
 
-  mtext( side=1, outer=TRUE, line=0.5, text="Spawners ('000s)" )
+  xtext <- "Spawner abundance ('000s)"
+  if( sType==2 )
+    xtext <- "Total egg production (millions)"
+  else if( sType==3 )
+    xtext <- "Total egg mass (mt)"
+
+  mtext( side=1, outer=TRUE, line=0.5, text=xtext )
   mtext( side=2, outer=TRUE, line=0.5, text="Recruits ('000s)" )  
   dev.off() 
 }
@@ -1250,14 +1503,76 @@ plotStockRec <- function( rpt, folder="." )
 
 plotpFem <- function( rpt, folder="." )
 {
-  pdf( file=paste0(folder,"/pFem.pdf"), height=4.5, width=5 )
-  x <- rpt$broodYears
-  y <- invlogit(rpt$logitpFem_y)
-  plot( x=x, y=y, las=1, xlab="Brood Year", ylab="Proportion female", ylim=c(0,1) )
+  pdf( file=paste0(folder,"/fig18-pFem.pdf"), height=4.5, width=5 )
+  x <- rpt$broodYears[1:(length(rpt$broodYears)-2)]
+  y <- rpt$pFem_y[1:(length(rpt$broodYears)-2)]
+
+  if( is.finite(rpt$sdrpt[1,5]) )
+  {
+    Rse <- filter(rpt$sdrpt,par=="pFem_y")
+    Rlow_t <- Rse$lCI[1:(length(rpt$broodYears)-2)]
+    Rupp_t <- Rse$uCI[1:(length(rpt$broodYears)-2)]
+  }
+  else
+  {
+    Rlow_t <- rep(NA,rpt$nT)
+    Rupp_t <- rep(NA,rpt$nT)
+  }
+
+  plot( x=x, y=y, type="n", las=1, xlab="Brood Year", ylab="Proportion female", ylim=c(0,1) )
   grid()
   box()
+  segments( x0=x, y0=Rlow_t, y1=Rupp_t, lwd=6, col="grey80"  )
   lines( x=x, y=y )
-  points( x=x, y=y, pch=16 )
+  points( x=x, y=y, pch=16, cex=0.85 )
+  dev.off()
+}
+
+
+plotRelativeReproOutput <- function()
+{
+  folders <- c("mod2","mod3")
+
+  ylabs <- c("Eggs per spawner ('000s)",
+             "Egg mass per spawner (kg)")
+
+  pdf( file="figs/fig21-relReproOutput.pdf", height=6, width=5 )
+  par( mfrow=c(2,1), mar=c(0.5,4,0,0), oma=c(4,0,1,1) )
+
+  for( i in 1:2 )
+  {
+    load(paste0("fits/",folders[i],"/rpt.Rdata"))
+    x <- rpt$years
+    y <- rpt$relReproOutput_t
+  
+    if( is.finite(rpt$sdrpt[1,5]) )
+    {
+      Rse <- filter(rpt$sdrpt,par=="relReproOutput_t")
+      Rlow_t <- Rse$lCI
+      Rupp_t <- Rse$uCI
+    }
+    else
+    {
+      Rlow_t <- rep(NA,rpt$nT)
+      Rupp_t <- rep(NA,rpt$nT)
+    }
+
+    plot( x=range(x), y=range(y,Rlow_t,Rupp_t,na.rm=TRUE),
+          type="n", axes=FALSE, xlab="Year",
+          ylab=ylabs[i] )
+    axis( side=1, labels=NA )
+    axis( side=2, las=1 )
+    grid()
+    box()
+    segments( x0=x, y0=Rlow_t, y1=Rupp_t, lwd=6, col="grey80"  )
+    lines( x=x, y=y )
+    points( x=x, y=y, pch=16, cex=0.8 )
+
+  }
+  axis( side=1 )
+
+  mtext(side=1,text="             Year",outer=TRUE,line=2.5)
+
   dev.off()
 }
 
@@ -1296,10 +1611,12 @@ plotMETF <- function( rpt, folder="." )
 
 plotSelectivityByLength <- function( rpt, folder="." )
 {
-
+  cols <- brewer.pal(3,"Set1")[1:2]
+  load("data/chinookYkData.Rdata")
+  L_as <- apply(chinookYkData$rawMETF_ast,1:2,mean,na.rm=TRUE)
   pars <- list(lambda=rpt$pearLambda,theta=rpt$pearTheta,sigma=rpt$pearSigma,tau=rpt$pearTau)
   
-  lengthSeq <- 400:900
+  lengthSeq <- 300:1200
   mm_per_inch <- 25.4 
   
   # Pearson function
@@ -1339,18 +1656,25 @@ plotSelectivityByLength <- function( rpt, folder="." )
   
   # plot the curves
   par( mar=c(4,4,1,1), oma=c(0,0,0,0) )
-  pdf( file=paste0(folder,"/selectivityByLength.pdf"), height=5, width=5 )
+  pdf( file=paste0(folder,"/fig16-selectivityByLength.pdf"), height=6.5, width=6.5 )
   plot( x=range(lengthSeq), y=c(0,1), las=1, type="n", xlab="Fish Length (METF; mm)", ylab="Selectivity")
   plotbg()
+  for( s in 1:2 )
+    for( a in 1:rpt$nA )
+        abline( v=L_as[a,s], col=cols[s], lty=a )
+  maxS <- numeric(rpt$nM)
   for( m in 1:rpt$nM )
   {
     y <- do.call(Pearson, append(pars, list(fish_length = lengthSeq, mesh_stretch_length = rpt$meshSizes[m] * mm_per_inch)))
     lines( x=lengthSeq, y=y, lwd=1.5, lty=m )
+    maxS[m] <- lengthSeq[which.max(y)]
   }
 
+  leg <- c(paste0("Male age-",rpt$ages),paste0("Female age-",rpt$ages))
   legend("topleft", legend=paste(rpt$meshSizes,"in"), lty=1:rpt$nM, bty="n", lwd=1.5)
+  legend("topright", legend=leg, lty=c(1:rpt$nA,1:rpt$nA), bty="n", col=c(rep(cols[1],4),rep(cols[2],4)))
   dev.off()
-
+  maxS
 #  plot(v_8 ~ lengthSeq, type = "l", ylim = c(0,1), xlab = "Fish Length (mm)", ylab = "Relative Selectivity")
 #  lines(v_6 ~ lengthSeq, lty = 2)
 #  legend("topleft", legend = c("8", "6"), title = "Mesh (in)", lty = c(1, 2), bty = "n")
@@ -1382,6 +1706,44 @@ plotSelectivityByLength <- function( rpt, folder="." )
 #  
 #  # select the mesh size you'd like to see
 #  v_use = v_6
+}
+
+
+plotProbReturnAtAge <- function( rpt, folder="." )
+{
+  eta_asy <- rpt$eta_aspy[ , ,1, ]
+  
+  cols <- brewer.pal( rpt$nA, "Set1" )
+
+  x <- rpt$broodYears
+
+  bump_sa <- matrix( data=0, nrow=2, ncol=rpt$nA )
+  bump_sa[1,3] <- 0.02
+  bump_sa[2,2] <- 0.08
+  bump_sa[2,rpt$nA] <- 0.04
+
+  pdf( file=paste0(folder,"/fig19-probReturnAtAge.pdf"), height=6.5, width=7 )
+  par( mfrow=c(2,1), mar=c(0.5,3,0,1), oma=c(4,2,1,1) )
+  for( s in 1:2 )
+  {
+    plot( x=range(x)+c(0,2.6), y=c(0,1), axes=FALSE, type="n" )
+    grid()
+    box()
+    for( a in 1:rpt$nA ) 
+      lines( x, eta_asy[a,s, ], col=cols[a], lwd=1.5 )
+    axis( side=1, labels=NA )
+    axis( side=2, las=1 )
+
+    text( x=x[rpt$nY]+2.1, y=eta_asy[ ,s,rpt$nY]+bump_sa[s, ],
+      col=cols, labels=paste0("Age-",rpt$ages), cex=0.9 )
+    par(font=2)
+    legend( x="topleft", legend=c("Male","Female")[s], bty="n" )
+    par(font=1)
+  }
+  axis( side=1 )
+  mtext( side=1, text="Brood year", outer=TRUE, line=2.5 )
+  mtext( side=2, text="Proportion returning-at-age", outer=TRUE, line=0.5 )
+  dev.off()
 }
 
 
