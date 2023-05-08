@@ -1,0 +1,39 @@
+---
+title: "Historical Chinook Harvest in the Yukon"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  html_document:
+    collapsed: no
+    fig_caption: yes
+    theme: sandstone
+    keep_md: FALSE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(here)
+
+har_data <- read.csv(here("data/harvest/yukon-chinook-fishery-history.csv")) |>
+  mutate(harvest = as.numeric(harvest))
+
+commercial_harvest <- filter(har_data, fishery == "commercial")
+
+subsistence_harvest <- filter(har_data, fishery == "subsistence")
+```
+
+```{r commercial plot, fig.cap = "Commercial drift gillnet catch by gear type and river section."}
+ggplot(commercial_harvest, aes(x = year,y = harvest, fill = gear.restriction)) +
+  geom_bar(position = "stack", stat = "identity") +
+  facet_wrap(~river.section) +
+  theme_minimal() +
+  scale_fill_viridis_d()
+```
+
+```{r subsistence plot, fig.cap = "Number of households and gear types by river section."}
+ggplot(subsistence_harvest, aes(x = year,y = subsistence.households, fill = gear.type)) +
+  geom_bar(position = "stack", stat = "identity") +
+  facet_wrap(~river.section) +
+  theme_minimal() +
+  scale_fill_viridis_d()
+```
